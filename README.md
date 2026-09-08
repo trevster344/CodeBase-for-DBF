@@ -2,6 +2,12 @@
 ## Product Overview
 CodeBase is a library of functions, written in C and compiled to a .DLL (or Linux equivalent), which allow compatible programs to read, write, create, index, and otherwise manipulate .DBF data tables.  The library provides a large array of capabilities that allow for creation of sophisticated data supported applications both for stand-alone processes and for multi-user processes where dozens of users access the tables simultaneously.  While this repository is Windows oriented, the underlying code released here provides for compilation to Linux and other OS targets.
 
+Note to Python users: To take advantage of the power of CodeBase, you do NOT need to use this set of tools to access the DLL directly.  We have created CodeBase Tools for Python which greatly simplifies day-to-day use of DBF tables with all the rich features they supply to your Python applications.  As of July, 2026, users of Windows versions of Python 3.6 through 3.14, 32-bit, and users of Windows versions of Python 3.10 through 3.14, 64-bit, can load this module directly onto their machines using pip:
+
+`pip install Code-Base-Tools`
+
+For more on the PyPI module access and documentation see https://pypi.org/project/Code-Base-Tools/
+
 ## Copyright and Release to Open Source
 CodeBase is copyright Sequiter, Inc., and was released to Open Source by Sequiter, Inc. in 2018.  A PDF containing the agreement to release the software and the applicable GNU Lesser GPL V.3.0 license is included in this repository.  This formerly proprietary software is now available to the larger community for development and refinement.  This repository was created in GitHub by M-P Systems Services, Inc., under an agreement with Sequiter to make their compiled products and source code available to the Open Source community.
 
