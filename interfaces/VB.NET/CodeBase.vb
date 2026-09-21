@@ -176,6 +176,8 @@ Module CodeBase
     Declare Function code4hWnd Lib "c4dll.dll" (ByVal c4 As Integer, ByVal value As Integer) As Integer
     Declare Function code4init Lib "c4dll.dll" Alias "code4initVB" () As Integer
     Declare Function code4initUndo Lib "c4dll.dll" (ByVal c4 As Integer) As Short
+    ' diagnostic: current number of live CODE4 instances (should return to 0)
+    Declare Function code4numCodeBaseCount Lib "c4dll.dll" () As UInteger
     Declare Sub code4largeOn Lib "c4dll.dll" (ByVal c4 As Integer)
     Declare Sub code4limitKeySizeSet Lib "c4dll.dll" (ByVal c4 As Integer, ByVal value As Short)
     Declare Function code4lock Lib "c4dll.dll" (ByVal c4 As Integer) As Short
