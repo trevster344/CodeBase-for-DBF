@@ -205,6 +205,8 @@ Module CodeBase
     Declare Function code4hWnd Lib "c4dll.dll" (ByVal c4 As IntPtr, ByVal value As Integer) As IntPtr
     Declare Function code4init Lib "c4dll.dll" Alias "code4initVB" () As IntPtr
     Declare Function code4initUndo Lib "c4dll.dll" (ByVal c4 As IntPtr) As Short
+    ' diagnostic: current number of live CODE4 instances (should return to 0)
+    Declare Function code4numCodeBaseCount Lib "c4dll.dll" () As UInteger
     Declare Sub code4largeOn Lib "c4dll.dll" (ByVal c4 As IntPtr)
     Declare Sub code4limitKeySizeSet Lib "c4dll.dll" (ByVal c4 As IntPtr, ByVal value As Short)
     Declare Function code4lock Lib "c4dll.dll" (ByVal c4 As IntPtr) As Short
@@ -1089,7 +1091,7 @@ Module CodeBase
         d4alias = b4String(d4aliasCB(dbPtr))
     End Function
 
-    Function d4create(ByVal cb As IntPtr, ByRef dbname As String, ByRef D() As FIELD4INFO, ByRef n() As TAG4INFO) As Integer
+    Function d4create(ByVal cb As IntPtr, ByRef dbname As String, ByRef D() As FIELD4INFO, ByRef n() As TAG4INFO) As IntPtr
 
         ' d4create calls d4createLow() to create a new database.
         ' This function is the same as d4createData() except that
@@ -1170,7 +1172,7 @@ Module CodeBase
 
     End Function
 
-    Function d4createData(ByVal cb As IntPtr, ByRef dbname As String, ByRef D() As FIELD4INFO) As Integer
+    Function d4createData(ByVal cb As IntPtr, ByRef dbname As String, ByRef D() As FIELD4INFO) As IntPtr
 
         ' d4createData() calls d4createLow() to create a new database.
         ' d4create() builds the FIELD4INFOCB array which is
@@ -1220,7 +1222,7 @@ Module CodeBase
         d4encodeHandle = EncodedString
     End Function
 
-    Function d4fieldsAdd(ByRef DATA4 As IntPtr, ByRef fields() As FIELD4INFO) As Integer
+    Function d4fieldsAdd(ByRef DATA4 As IntPtr, ByRef fields() As FIELD4INFO) As IntPtr
         Dim i As Short
         Dim ub As Short
 
@@ -1235,7 +1237,7 @@ Module CodeBase
         Next i
 
         d4fieldsAdd = d4fieldsAddCB(DATA4, ub, f(LBound(f)))
-        If d4fieldsAdd <> 0 Then
+        If d4fieldsAdd <> IntPtr.Zero Then
             DATA4 = d4fieldsAdd
         End If
 
@@ -1247,7 +1249,7 @@ Module CodeBase
         Next i
     End Function
 
-    Function d4fieldsRemove(ByRef DATA4 As IntPtr, ByRef fieldNames() As String) As Integer
+    Function d4fieldsRemove(ByRef DATA4 As IntPtr, ByRef fieldNames() As String) As IntPtr
         Dim addrs() As IntPtr
         Dim i As Short
         ReDim addrs(UBound(fieldNames))
@@ -1572,7 +1574,7 @@ Module CodeBase
         f4memoStrUnicode = RTrimNulls(Left(System.Text.UnicodeEncoding.Unicode.GetString(bArray), f4memoLen(field)))
     End Function
 
-    Function i4create(ByVal dbPtr As IntPtr, ByRef IndexName As String, ByRef n() As TAG4INFO) As Integer
+    Function i4create(ByVal dbPtr As IntPtr, ByRef IndexName As String, ByRef n() As TAG4INFO) As IntPtr
         ' i4create() calls i4createCB() to create a new
         ' index file. Variable n is an array of type TAG4INFO
         ' which corresponds to TAG4INFOCB, a structure that
@@ -1626,7 +1628,7 @@ Module CodeBase
         i4fileName = b4String(i4fileNameCB(iPtr))
     End Function
 
-    Function i4open(ByRef d4 As IntPtr, ByRef fName As String) As Integer
+    Function i4open(ByRef d4 As IntPtr, ByRef fName As String) As IntPtr
         If fName = "" Then
             i4open = i4openCB(d4, 0) 'Use data file name
         Else

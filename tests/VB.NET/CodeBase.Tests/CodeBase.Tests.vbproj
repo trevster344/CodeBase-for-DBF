@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CodeBase.Tests.VB - runnable console test for the CodeBase native engine (VB.NET).
+
+    Compile/run for a specific bitness:
+       dotnet run -c Release -f net8.0 -p:Platform=x86
+       dotnet run -c Release -f net8.0 -p:Platform=x64
+       dotnet run -c Release -f net48  -p:Platform=x86
+       dotnet run -c Release -f net48  -p:Platform=x64
+
+    x86 compiles interfaces/VB.NET/CodeBase.vb   (Integer handles)
+    x64 compiles interfaces/VB.NET/CodeBase64.vb (IntPtr handles)
+    The native engine is copied from the build output directories by default; override with
+    -p:CodeBaseNative32=<dir> / -p:CodeBaseNative64=<dir>. Build the native DLLs first.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
+    <Platforms>x86;x64</Platforms>
+    <AssemblyName>CodeBase.Tests.VB</AssemblyName>
+    <RootNamespace>CodeBase.Tests</RootNamespace>
+    <OptionStrict>Off</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+    <NoWarn>$(NoWarn);42016;42017;42018;42019;42020;42021;42022;42029;42030;42032;42304;42353;42354</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Platform)'=='x86'">
+    <PlatformTarget>x86</PlatformTarget>
+    <DefineConstants>EXPECT_X86</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <PlatformTarget>x64</PlatformTarget>
+    <DefineConstants>EXPECT_X64</DefineConstants>
+  </PropertyGroup>
+
+  <!-- The VB interface under test, selected by bitness. -->
+  <ItemGroup Condition="'$(Platform)'=='x86'">
+    <Compile Include="..\..\..\interfaces\VB.NET\CodeBase.vb" Link="CodeBase.vb" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Platform)'=='x64'">
+    <Compile Include="..\..\..\interfaces\VB.NET\CodeBase64.vb" Link="CodeBase64.vb" />
+  </ItemGroup>
+
+  <!-- Native engine, selected by platform. -->
+  <PropertyGroup>
+    <CodeBaseNative32 Condition="'$(CodeBaseNative32)'==''">$(MSBuildThisFileDirectory)..\..\..\build\MVStudio_2022_Project_VFP_STAND_ALONE_32</CodeBaseNative32>
+    <CodeBaseNative64 Condition="'$(CodeBaseNative64)'==''">$(MSBuildThisFileDirectory)..\..\..\build\MVStudio_2022_Project_VFP_STAND_ALONE_64</CodeBaseNative64>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(Platform)'=='x86'">
+    <None Include="$(CodeBaseNative32)\C4dll.dll" Link="c4dll.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative32)\C4dll.dll')" />
+    <None Include="$(CodeBaseNative32)\zlib.dll" Link="zlib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative32)\zlib.dll')" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Platform)'=='x64'">
+    <!-- The VB Declares reference "c4dll.dll", so deploy the 64-bit engine under that name. -->
+    <None Include="$(CodeBaseNative64)\C4DLL64.dll" Link="c4dll.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative64)\C4DLL64.dll')" />
+    <None Include="$(CodeBaseNative64)\zlib.dll" Link="zlib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative64)\zlib.dll')" />
+  </ItemGroup>
+
+</Project>

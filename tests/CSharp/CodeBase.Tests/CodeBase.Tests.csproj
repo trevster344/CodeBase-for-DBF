@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CodeBase.Tests.CSharp - runnable console test for the CodeBase native engine.
+
+    Compile/run for a specific bitness:
+       dotnet run -c Release -f net8.0 -p:Platform=x86
+       dotnet run -c Release -f net8.0 -p:Platform=x64
+       dotnet run -c Release -f net48  -p:Platform=x86
+       dotnet run -c Release -f net48  -p:Platform=x64
+
+    The native engine is copied from the build output directories by default; override with
+    -p:CodeBaseNative32=<dir> / -p:CodeBaseNative64=<dir> (e.g. to point at the client/server
+    or MPSSProductionVersions DLLs). Build the native DLLs first (see WorkingSource/ReadMe.md).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
+    <Platforms>x86;x64</Platforms>
+    <AssemblyName>CodeBase.Tests.CSharp</AssemblyName>
+    <RootNamespace>CodeBase.Tests</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);1591;CS0618</NoWarn>
+  </PropertyGroup>
+
+  <!-- Choose the process bitness (and, for x64, the c4dll64.dll import name). -->
+  <PropertyGroup Condition="'$(Platform)'=='x86'">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <PlatformTarget>x64</PlatformTarget>
+    <DefineConstants>$(DefineConstants);X64</DefineConstants>
+  </PropertyGroup>
+
+  <!-- The C# interface under test. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\interfaces\CSharp\Codebase.cs" Link="Codebase.cs" />
+  </ItemGroup>
+
+  <!-- Native engine, selected by platform. -->
+  <PropertyGroup>
+    <CodeBaseNative32 Condition="'$(CodeBaseNative32)'==''">$(MSBuildThisFileDirectory)..\..\..\build\MVStudio_2022_Project_VFP_STAND_ALONE_32</CodeBaseNative32>
+    <CodeBaseNative64 Condition="'$(CodeBaseNative64)'==''">$(MSBuildThisFileDirectory)..\..\..\build\MVStudio_2022_Project_VFP_STAND_ALONE_64</CodeBaseNative64>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(Platform)'=='x86'">
+    <None Include="$(CodeBaseNative32)\C4dll.dll" Link="c4dll.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative32)\C4dll.dll')" />
+    <None Include="$(CodeBaseNative32)\zlib.dll" Link="zlib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative32)\zlib.dll')" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Platform)'=='x64'">
+    <None Include="$(CodeBaseNative64)\C4DLL64.dll" Link="c4dll64.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative64)\C4DLL64.dll')" />
+    <None Include="$(CodeBaseNative64)\zlib.dll" Link="zlib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(CodeBaseNative64)\zlib.dll')" />
+  </ItemGroup>
+
+</Project>
