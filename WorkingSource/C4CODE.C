@@ -242,7 +242,7 @@ unsigned int S4FUNCTION code4numCodeBaseCount( void )
             myTrial->Title = "CodeBase SQL 2.0 - Evaluation Version";
             myTrial->Caption = "CodeBase SQL 2.0";
             myTrial->Version = "";
-            myTrial->Copyright = "© 1988-2003 Sequiter Software, Inc.";
+            myTrial->Copyright = "ï¿½ 1988-2003 Sequiter Software, Inc.";
 
             myTrial->MsgWelcome = "This is a # trial version of CodeBase SQL 2.0.";
             myTrial->MsgFirst = "Click OK to begin the trial period. Click Cancel to begin the trial period later.";
@@ -280,7 +280,17 @@ unsigned int S4FUNCTION code4numCodeBaseCount( void )
 
       #ifdef S4SEMAPHORE
          #ifdef S4WIN32
-            InitializeCriticalSection( &critical4code ) ;
+            /* Only initialize the process-wide critical section on process attach.
+               DllMain is also invoked for DLL_THREAD_ATTACH / DLL_THREAD_DETACH (for example
+               each _beginthread delay-write / advance-read worker). Re-initializing
+               critical4code there resets its owning thread while another thread may be inside
+               it, so a later LeaveCriticalSection() fails with RtlpNotOwnerCriticalSection
+               (fast-fail / 0xC0000264) or deadlocks. This was the cause of repeated
+               code4init()/code4initUndo() hangs and crashes with the worker threads enabled. */
+            if ( reasonForCall == DLL_PROCESS_ATTACH )
+               InitializeCriticalSection( &critical4code ) ;
+            if ( reasonForCall == DLL_PROCESS_DETACH )
+               DeleteCriticalSection( &critical4code ) ;
          #endif
       #endif
 
