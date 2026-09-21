@@ -1,0 +1,44 @@
+# Generated build output and Visual Studio state.
+#
+# The project/solution files (*.sln, *.vcxproj, *.vcproj, *.filters), the command-line build
+# scripts (*.cmd, *.lst), the ReadMe files, and the prebuilt zlib.lib / zlib.dll dependency are
+# intentionally tracked and are NOT ignored here.
+
+# Visual Studio / IntelliSense state
+.vs/
+*.suo
+*.user
+*.sdf
+*.db
+*.ipch
+*.vsidx
+
+# Compiler / linker output
+*.obj
+*.pdb
+*.exp
+*.ilk
+*.idb
+*.res
+*.tlog
+*.lastbuildstate
+*.recipe
+*.log
+
+# Build output directories
+IntermediateFiles/
+LatestCompileOutputBackup/
+
+# Libraries and binaries (keep the prebuilt zlib dependency)
+*.lib
+!zlib.lib
+*.dll
+!zlib.dll
+*.exe
+
+# Visual Studio upgrade reports
+UpgradeLog.*
+_UpgradeReport_Files/
+
+# Backups
+*.bak
