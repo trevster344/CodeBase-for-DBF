@@ -1224,8 +1224,11 @@ Module CodeBase
 
         d4fieldsRemove = d4fieldsRemoveCB(DATA4, UBound(fieldNames) - LBound(fieldNames) + 1, addrs(LBound(addrs)))
 
+        ' addrs() holds native char* pointers returned by v4Cstring() (which allocates).
+        ' They must be released with v4Cstringfree(). The original code called v4Cstring()
+        ' here instead, which allocated another C string and leaked the one already made.
         For i = LBound(addrs) To UBound(addrs)
-            Call v4Cstring(CStr(addrs(i)))
+            Call v4Cstringfree(addrs(i))
         Next i
     End Function
 
