@@ -1078,6 +1078,12 @@ namespace CodeBase
       private static extern IntPtr code4initVB( );
       [DllImport(CodeBaseNative.DllName)]
       private static extern int code4initUndo(IntPtr code4);
+      // diagnostic: current number of live CODE4 instances. A program that pairs every
+      // code4init() with code4initUndo() must see this return to 0; a steadily increasing
+      // value means CODE4 handles are being leaked.
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern uint code4numCodeBaseCount( );
+      public static uint numCodeBaseInstances() { return code4numCodeBaseCount() ; }
       [DllImport(CodeBaseNative.DllName)]
       private static extern void code4largeOn( IntPtr code4 ) ;
       [DllImport(CodeBaseNative.DllName)]
