@@ -114,6 +114,15 @@ char *expr4buf = 0 ;
 unsigned int numCode4 = 0 ;  /* used to determine when mem4reset() should be called */
 extern int resetInProgress ;
 
+/* diagnostic accessor - the code4numCodeBase() macro is not linkable from a DLL export.
+   Returns the number of currently-live CODE4 instances.  A correctly-behaving application
+   that releases every code4init() with code4initUndo() must see this return to 0; a value
+   that keeps growing across init/undo cycles indicates leaked CODE4 handles. */
+unsigned int S4FUNCTION code4numCodeBaseCount( void )
+{
+   return numCode4 ;
+}
+
 #ifdef S4MAC_TCP
    char initThread = 0 ;
 #endif

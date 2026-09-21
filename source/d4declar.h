@@ -1925,6 +1925,9 @@ void code4memStartMaxSet( CODE4 *, const int ) ;
 /* AS 09/01/98 code4numCodeBase critical to be fast, don't implement as function */
 extern unsigned int numCode4 ;
 #define code4numCodeBase() ( numCode4 )
+/* linkable accessor for numCode4 (the macro above cannot be exported from a DLL); used by
+   tests/harnesses to assert that every code4init() was matched by a code4initUndo(). */
+S4EXPORT unsigned int S4FUNCTION code4numCodeBaseCount( void ) ;
 int code4optRestart( CODE4 * ) ;
 int code4unlockDo( LIST4 * ) ;
 int code4verify( CODE4 *, int ) ;
