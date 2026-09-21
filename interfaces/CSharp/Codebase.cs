@@ -315,7 +315,10 @@ namespace CodeBase
       public int isTrue()                 { return expr4true( expr ) ; }
    }
 
-   public class Code4 : Error4
+   /* IDisposable so callers can release the native CODE4 deterministically (see initUndo /
+      Dispose / the finalizer below). The native handle itself is IntPtr (pointer-sized), so
+      this class is correct on both 32- and 64-bit. */
+   public class Code4 : Error4, IDisposable
    {
       private short init_p ;
 
@@ -1198,19 +1201,41 @@ namespace CodeBase
             init_p = 0 ;
          return ( init_p != 0 ? 1 : 0 ) ;
       }
+      /* Releases the native CODE4. Safe to call more than once; only the first call that
+         sees a live handle actually invokes code4initUndo(). */
       public int initUndo()
       {
          int rc = r4success ;
          if ( init_p != 0 )
          {
             rc = code4initUndo( code4 ) ;
-            if (rc == r4success)
-            {
-               init_p = 0 ;
-               code4 = IntPtr.Zero;
-            }
+            // code4initUndo returns the CODE4's last error code rather than a success
+            // flag, so always clear the handle once the native undo has been invoked.
+            // (Gating on "rc == r4success" would leave a freed pointer stored in code4
+            // whenever the CODE4 had a non-zero error code, causing a later double free.)
+            init_p = 0 ;
+            code4 = IntPtr.Zero ;
          }
          return rc ;
+      }
+
+      /* Deterministic release. Call this (or use a using block) as soon as the Code4 is no
+         longer needed. In long-lived hosts such as an ASP.NET worker process this is what
+         keeps CODE4 handles from accumulating request after request. */
+      public void Dispose()
+      {
+         initUndo() ;
+         GC.SuppressFinalize( this ) ;
+      }
+
+      /* Finalizer backstop: if a Code4 was garbage collected without Dispose() being called,
+         release the native handle here rather than leaking it. Dispose() suppresses this via
+         GC.SuppressFinalize(), so the normal path never reaches it. */
+      ~Code4()
+      {
+         // finalizer backstop so a Code4 that was never explicitly undone still releases
+         try { initUndo() ; }
+         catch { }
       }
       public void largeOn() { code4largeOn( code4 ) ; }
 
