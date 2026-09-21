@@ -1100,7 +1100,25 @@ int S4FUNCTION code4initLow( CODE4 *c4, const char *defaultProtocol, long versio
       rc = code4tranInit( c4 ) ;
       if ( rc < 0 )
       {
+         // numCode4-- must be atomic w.r.t. the memory manager, otherwise a concurrent
+         // init/undo could observe a transient 0 and reset the pools.
+         #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+            #ifdef S4SEMAPHORE
+               #ifdef S4WIN32
+                  EnterCriticalSection( &critical4code ) ;
+               #endif
+            #endif
+         #endif
+
          numCode4--;
+
+         #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+            #ifdef S4SEMAPHORE
+               #ifdef S4WIN32
+                  LeaveCriticalSection( &critical4code ) ;
+               #endif
+            #endif
+         #endif
          return error4( 0, rc, E91001 ) ;
       }
 
@@ -1415,7 +1433,22 @@ int S4FUNCTION code4initLow( CODE4 *c4, const char *defaultProtocol, long versio
          c4->ver4 = code4osVersion() ;
          if ( c4->ver4 <= 0 )
          {
+            // guard numCode4-- so a concurrent init/undo cannot see a transient 0
+            #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+               #ifdef S4SEMAPHORE
+                  #ifdef S4WIN32
+                     EnterCriticalSection( &critical4code ) ;
+                  #endif
+               #endif
+            #endif
             numCode4--;
+            #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+               #ifdef S4SEMAPHORE
+                  #ifdef S4WIN32
+                     LeaveCriticalSection( &critical4code ) ;
+                  #endif
+               #endif
+            #endif
             return error4( 0, e4result, E91001 ) ;
          }
          c4->readMessageBufferLen = READ4MESSAGE_BUFFER_LEN ;
@@ -1446,19 +1479,64 @@ int S4FUNCTION code4initLow( CODE4 *c4, const char *defaultProtocol, long versio
             c4->inter = (INTER4 *)u4alloc( sizeof( INTER4 ) ) ;
             if ( c4->inter == 0 )
             {
+               // guard numCode4-- so a concurrent init/undo cannot see a transient 0
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        EnterCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                numCode4--;
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        LeaveCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                return error4( 0, e4memory, E91001 ) ;
             }
             if ( inter4init( c4->inter, c4 ) < 0 )
             {
+               // guard numCode4-- so a concurrent init/undo cannot see a transient 0
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        EnterCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                numCode4--;
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        LeaveCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                return error4( 0, e4result, E91001 ) ;
             }
             c4->interThreadHandle = (unsigned long) _beginthread( inter4, 5000, c4->inter ) ;
             if ( c4->interThreadHandle == -1 )
             {
                inter4initUndo( c4->inter ) ;
+               // guard numCode4-- so a concurrent init/undo cannot see a transient 0
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        EnterCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                numCode4--;
+               #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+                  #ifdef S4SEMAPHORE
+                     #ifdef S4WIN32
+                        LeaveCriticalSection( &critical4code ) ;
+                     #endif
+                  #endif
+               #endif
                return error4( 0, e4result, E91001 ) ;
             }
          #endif
@@ -1659,13 +1737,39 @@ CODE4 *S4FUNCTION code4allocLow( int doInit, const char *defaultProtocol, long v
       }
    #endif
 
+   /*******************************************************************************************
+      CODE4 lifecycle / global memory-manager reference counting.
+
+      numCode4 counts live CODE4 instances.  It is not just a statistic: the CodeBase memory
+      manager keys off it (see m4memory.c).  mem4allocErrDefault() and mem4createDefault()
+      refuse to hand out memory while numCode4 == 0, and code4initUndo2() calls mem4reset()
+      (which frees the global memory pools) the moment numCode4 drops back to 0.
+
+      g_extraInits / didExtraInit exist because code4allocLow() performs the one-time
+      mem4init() here (before code4initLow() runs), while code4initLow() also wants to call
+      mem4init() when it sees numCode4 == 0.  mem4init()/mem4reset() are themselves a nested
+      reference count (memoryInitialized in m4memory.c), so an unmatched extra mem4init() means
+      the pools are never fully reset.  g_extraInits is the "credit" for the init already done
+      here; didExtraInit records whether *this* call issued that credit so the success/failure
+      paths below only give it back when they actually took it.
+   *******************************************************************************************/
+
    // AS Feb 14/03 - If code4allocLow() is used in place of static CODE4's there was
    // a memory leak occurring due to an extra call to mem4init().
+   Bool5 didExtraInit = 0 ;
    if ( numCode4 == 0 && resetInProgress == 0 )
    {
       mem4init() ;
       g_extraInits++ ;
+      didExtraInit = 1 ;
    }
+
+   // AS Nov 5/2013 - increment numCode4 while we still hold critical4code, BEFORE releasing it
+   // below.  Otherwise there is a window where this thread has not yet counted itself (the old
+   // code incremented inside code4initLow(), after the lock was dropped): a concurrent
+   // code4initUndo() could observe numCode4 == 0, call mem4reset(), and free the global memory
+   // pools out from under this thread mid-initialization - corrupting the counters and crashing.
+   numCode4++ ;
 
    #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
       #ifdef S4SEMAPHORE
@@ -1688,7 +1792,36 @@ CODE4 *S4FUNCTION code4allocLow( int doInit, const char *defaultProtocol, long v
    #endif
 
    if ( c4 == 0 )
+   {
+      // Allocation of the CODE4 struct failed.  We already incremented numCode4 (and possibly
+      // took the mem4init()/g_extraInits credit) above, so give both back under the lock and
+      // let mem4reset() run if we were the last one.  Skipping this restoration makes the
+      // reference counts drift permanently, after which mem4reset() stops resetting and the
+      // process leaks until allocations fail.
+      #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+         #ifdef S4SEMAPHORE
+            #ifdef S4WIN32
+               EnterCriticalSection( &critical4code ) ;
+            #endif
+         #endif
+      #endif
+
+      numCode4-- ;
+      if ( didExtraInit )
+         g_extraInits-- ;
+      if ( numCode4 == 0 && resetInProgress == 0 )   /* reset memory */
+         mem4reset() ;
+
+      #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+         #ifdef S4SEMAPHORE
+            #ifdef S4WIN32
+               LeaveCriticalSection( &critical4code ) ;
+            #endif
+         #endif
+      #endif
+
       return 0 ;
+   }
 
    if ( doInit == 1 )
    {
@@ -1697,8 +1830,10 @@ CODE4 *S4FUNCTION code4allocLow( int doInit, const char *defaultProtocol, long v
       int rc = code4initLow( c4, defaultProtocol, versionId, 0, 0 ) ;
       if ( rc < 0 )
       {
-         // on the uninit we need to reset all the values that were potentially set up.  We also need to mark that
-         // there is at least 1 CODE4 because otherwise the u4free will fail...
+         // code4initLow() failed.  It has already undone any numCode4 increment it made, so the
+         // single numCode4-- below removes exactly the increment this function made above.
+         // (The old code did numCode4++ / u4free / numCode4-- here because it relied on
+         // code4initLow() to do the counting; that is no longer the case.)
          #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
             #ifdef S4SEMAPHORE
                #ifdef S4WIN32
@@ -1707,10 +1842,10 @@ CODE4 *S4FUNCTION code4allocLow( int doInit, const char *defaultProtocol, long v
             #endif
          #endif
 
-         numCode4++ ;
          u4free( c4 ) ;
          numCode4-- ;
-         g_extraInits-- ;
+         if ( didExtraInit )
+            g_extraInits-- ;
          if ( numCode4 == 0 && resetInProgress == 0)   /* reset memory */
             mem4reset() ;
          #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
@@ -1723,6 +1858,30 @@ CODE4 *S4FUNCTION code4allocLow( int doInit, const char *defaultProtocol, long v
 
          return 0 ;
       }
+      #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+         #ifdef S4SEMAPHORE
+            #ifdef S4WIN32
+               EnterCriticalSection( &critical4code ) ;
+            #endif
+         #endif
+      #endif
+
+      // code4initLow() also incremented numCode4 for this instance, so offset the extra
+      // increment made at the top of this function - exactly one count remains per live CODE4.
+      // If this call performed the mem4init(), give back the g_extraInits credit too so the
+      // init/reset bookkeeping stays balanced across repeated init/undo cycles.
+      numCode4-- ;
+      if ( didExtraInit )
+         g_extraInits-- ;
+
+      #if defined( __DLL__ ) && defined( S4WIN32 ) && !defined( S4JOINT_OLEDB_DLL )
+         #ifdef S4SEMAPHORE
+            #ifdef S4WIN32
+               LeaveCriticalSection( &critical4code ) ;
+            #endif
+         #endif
+      #endif
+
       c4->didAlloc = 1 ;
    }
    return c4 ;
