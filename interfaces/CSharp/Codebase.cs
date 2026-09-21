@@ -22,6 +22,21 @@ namespace CodeBase
    using System.Runtime.InteropServices;
    using System.Text ;  /* LY 2002/09/24 : for StringBuilder */
 
+   /* Single source of truth for the native CodeBase library name.
+      A DllImport name must be a compile-time constant, so it cannot be chosen at run time.
+      The 32-bit engine is c4dll.dll and the 64-bit engine is c4dll64.dll, therefore the
+      correct name is selected at build time via the X64 symbol (define X64 in the 64-bit
+      build configuration). If you prefer not to switch the name, you can instead deploy the
+      64-bit DLL renamed to c4dll.dll - then the #else branch is correct on both platforms. */
+   public static class CodeBaseNative
+   {
+#if X64
+      public const string DllName = "c4dll64.dll" ;
+#else
+      public const string DllName = "c4dll.dll" ;
+#endif
+   }
+
    public class Error4
    {
       protected IntPtr code4 ;  // This is the most used member and is need in error handling.
@@ -138,54 +153,54 @@ namespace CodeBase
       public const int E61204 = 60108 ;
 
       /* functions used by classes in addition to Code4 */
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int c4getLockEnforce(IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern short code4accessMode(IntPtr code4, [MarshalAs(UnmanagedType.I4)] int accessMode);
 
       /* functions used by classes in addition to Data4 */
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern short d4changed( IntPtr data4, [MarshalAs(UnmanagedType.I2)] short flag ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int d4recNoLow( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern short d4numFields( IntPtr data4 ) ;
 
       /* functions used by classes Field4, Field4info, Field4memo */
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern IntPtr d4fieldJ(IntPtr data4, [MarshalAs(UnmanagedType.I2)] short number);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern IntPtr d4field(IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string name);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int f4decimals( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern uint f4len( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : replaced f4name() (see Field4::name())*/
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : replaced f4name() (see Field4::name())*/
       protected static extern void f4nameW( IntPtr field4, System.Text.StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int f4null( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern char f4type( IntPtr field4 ) ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern void u4freeDefault( int ptr ) ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int error4set( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errorCode ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int error4number2( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errorCode ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern short code4errorCode( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short errorCode ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short error4VB( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short errorCode ,[MarshalAs(UnmanagedType.I4)] int extraInfo ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int error4describeDefault( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int er, [MarshalAs(UnmanagedType.I4)] int er2,
          [MarshalAs(UnmanagedType.LPStr)] string p1, [MarshalAs(UnmanagedType.LPStr)] string p2, [MarshalAs(UnmanagedType.LPStr)] string p3) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int error4file( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string fileName ,[MarshalAs(UnmanagedType.I4)] int overwrite ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void error4exitTest( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from error4text() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from error4text() */
       private static extern void error4textW( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errCode, StringBuilder buff ) ;
 
       public int throwError( short errorCode, int extraInfo )
@@ -213,28 +228,28 @@ namespace CodeBase
       public Expr4() { expr = IntPtr.Zero; }
       public Expr4( IntPtr ex )   { expr = ex ; }
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr expr4parseLow( IntPtr data4,
          [MarshalAs(UnmanagedType.LPStr)] string expression,
          [MarshalAs(UnmanagedType.I4)] int tagFile
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern double expr4double( IntPtr expr ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr expr4dataCB(IntPtr expr);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void expr4freeCB(IntPtr expr);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int expr4lenCB(IntPtr expr);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short expr4nullLow(IntPtr expr, [MarshalAs(UnmanagedType.I2)]  short forAdd);
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : replaced expr4source() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : replaced expr4source() */
       private static extern void expr4sourceW(IntPtr expr, StringBuilder buff);
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : replaced expr4str() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : replaced expr4str() */
       private static extern void expr4strW(IntPtr expr, StringBuilder buff);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short expr4typeCB(IntPtr expr);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int expr4true(IntPtr expr);
 
       public IntPtr EXPR4
@@ -305,123 +320,123 @@ namespace CodeBase
       private short init_p ;
 
       //properties of the Code4 structure
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getCreateTemp(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrCreate(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrExpr(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrFieldName(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrGo(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrOpen(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrRelate(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrSkip(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getErrTagName(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int c4getFileFlush(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setCreateTemp( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int createTemp  ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrCreate( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errCreate ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrExpr( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errExpr ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrFieldName( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errFieldName ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrGo( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errGo ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrOpen( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errOpen ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrRelate( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errRelate ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrSkip( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errSkip ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setErrTagName( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int errTagName ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setFileFlush( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int fileFlush ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void c4setLockEnforce( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int lockEnforce ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4autoOpen( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int openMode ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4codePage( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short codepage ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4collate( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short collation ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4collateUnicode( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short collation ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4collatingSequence( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short collation ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4compatibility( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short version ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4errDefaultUnique( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short errDefaultUnique ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4errOff( IntPtr code4, short mode ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4hWnd( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int hWnd ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4indexBlockSize(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4indexBlockSizeSet( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short blockSize ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4lockAttempts( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short lockAttempts ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4lockAttemptsSingle( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short lockAttemptsSingle ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4lockDelay( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int lockDelay ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4log( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short log ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memExpandBlock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memExpandBlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memExpandData( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memExpandData ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memExpandIndex( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memExpandIndex ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memExpandLock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memExpandLock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memExpandTag( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memExpandTag ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memSizeBlock( IntPtr code4, [MarshalAs(UnmanagedType.U4)] int memSizeBlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memSizeBuffer( IntPtr code4, [MarshalAs(UnmanagedType.U4)] int memSizeBuffer ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memSizeMemo( IntPtr code4, [MarshalAs(UnmanagedType.U2)] short memSizeMemo ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memSizeMemoExpr( IntPtr code4, [MarshalAs(UnmanagedType.U4)] int memSizeMemoExpr ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memSizeSortBuffer( IntPtr code4, [MarshalAs(UnmanagedType.U4)] int memSizeSortBuffer ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memSizeSortPool( IntPtr code4, [MarshalAs(UnmanagedType.U4)] int memSizeSortPool ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memStartBlock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memStartBlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memStartData( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int memStartBlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memStartIndex( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memStartIndex ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memStartLock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memStartLock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4memStartMax( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int memStartMax ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4memStartTag( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short memStartTag ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4optimize( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short optimize ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4optimizeWrite( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short optimizeWrite ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4readLock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short readLock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4readOnly( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short readOnly ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4safety( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short safety ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4singleOpen( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short singleOpen ) ;
 
       public IntPtr cod()   { return code4 ; }
@@ -1021,97 +1036,97 @@ namespace CodeBase
       }
 
       //Functions of the Code4
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void code4autoIncrementStart( IntPtr code4, [MarshalAs(UnmanagedType.R8)] double autoIncCurrentVal ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4calcCreate(IntPtr code4,
          IntPtr expr, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void code4calcReset( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4close( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4connect( IntPtr code4,
          [MarshalAs(UnmanagedType.LPStr)] string serverId, [MarshalAs(UnmanagedType.LPStr)] string processId,
          [MarshalAs(UnmanagedType.LPStr)] string userName, [MarshalAs(UnmanagedType.LPStr)] string password,
          [MarshalAs(UnmanagedType.LPStr)] string protocol ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr code4data( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string alias ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from code4dateFormat() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from code4dateFormat() */
       private static extern void code4dateFormatW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4dateFormatSet( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string format ) ;
-		[DllImport("c4dll.dll")]
+		[DllImport(CodeBaseNative.DllName)]
 		private static extern int code4encryptInit(IntPtr code4, byte[] key, short keyLen);
-		[DllImport("c4dll.dll")]
+		[DllImport(CodeBaseNative.DllName)]
 		private static extern void code4encryptFile(IntPtr code4, short encryptFlag);
-		[DllImport("c4dll.dll")]
+		[DllImport(CodeBaseNative.DllName)]
       private static extern void code4exit( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4flush( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4flushFiles( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from code4indexExtension() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from code4indexExtension() */
       private static extern void code4indexExtensionW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4allocLow( [MarshalAs(UnmanagedType.I4)] int inititize, [MarshalAs(UnmanagedType.LPStr)] string protocol, [MarshalAs(UnmanagedType.I4)] int version ) ;
       // CS 2007/09/18 Add code4initVB.
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr code4initVB( );
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4initUndo(IntPtr code4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void code4largeOn( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4lock( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void code4lockClear( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from code4lockFileName() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from code4lockFileName() */
       private static extern void code4lockFileNameW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4lockItem( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from code4lockUserId() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from code4lockUserId() */
       private static extern void code4lockUserIdW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/24 : changed from code4lockNetworkId */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/24 : changed from code4lockNetworkId */
       private static extern void code4lockNetworkIdW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4logCreate( IntPtr code4,
          [MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string userId ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : changed from code4logFileName() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : changed from code4logFileName() */
       private static extern void code4logFileNameW( IntPtr code4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4logOpen( IntPtr code4,
          [MarshalAs(UnmanagedType.LPStr)] string name, [MarshalAs(UnmanagedType.LPStr)] string userId ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void code4logOpenOff( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4optAll( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4optStart( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4optSuspend( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4timeout( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4timeoutSet( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int l ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4tranCommit( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4tranRollback( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4tranStart( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4tranStatusCB( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4unlock( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4unlockAutoCB( IntPtr code4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short code4unlockAutoSetCB( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short c ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4verifySet( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string value ) ;
       // CS 2007/09/18
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int error4callback(IntPtr code4, error4callbackFunction errorCallback);
 
       public Code4( )
@@ -1272,139 +1287,139 @@ namespace CodeBase
    {
       private IntPtr data ;
 
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced d4alias() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced d4alias() */
       private static extern void d4aliasW( IntPtr data4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void d4aliasSet( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string alias ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4append( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4appendBlank( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short d4appendStart( IntPtr data4, [MarshalAs(UnmanagedType.I2)] short useMemo ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void d4blank( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4bof( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4bottom( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4check( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4create( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr fieldInfo, IntPtr tagInfo );
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4close( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4code( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void d4delete( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4deleted( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4eof( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4fieldNumber( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string fieldName ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4fieldsAdd( IntPtr data4, [MarshalAs(UnmanagedType.I2)] short nFields, IntPtr fieldInfo);
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced d4fileName() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced d4fileName() */
       private static extern void d4fileNameW( IntPtr data4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4flush( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4freeBlocks( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4goLow( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int recNo, [MarshalAs(UnmanagedType.I2)] short goForWrite ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4goBof( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4goEof( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockInternal( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int recNum, [MarshalAs(UnmanagedType.U1)] byte doUnlock, [MarshalAs(UnmanagedType.I4)] int lockType ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAdd( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int recNum ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAddAppend( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAddFile( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAddAll( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAllInternal( IntPtr data4, [MarshalAs(UnmanagedType.U1)] byte doUnlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockAppendInternal( IntPtr data4, [MarshalAs(UnmanagedType.U1)] byte doUnlock ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockFileInternal( IntPtr data4, [MarshalAs(UnmanagedType.U1)] byte doUnlock, [MarshalAs(UnmanagedType.I4)] int lockType ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4log( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int logging ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short d4logStatusCB( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4memoCompress(IntPtr data4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4modifyStructure(IntPtr data4, IntPtr fieldInfo, IntPtr tagInfo );
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4open( IntPtr code4, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4openClone( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4optimize( IntPtr data4, [MarshalAs(UnmanagedType.I4)]  int opt ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4optimizeWrite( IntPtr data4, [MarshalAs(UnmanagedType.I4)]  int opt ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4pack( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern double d4position( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4positionSet( IntPtr data4, [MarshalAs(UnmanagedType.R8)] double pos ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void d4recall( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4recCountDo2( IntPtr data4, [MarshalAs(UnmanagedType.I2)] short assumeLocked ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern uint d4recWidthLow( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4refresh( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4refreshRecord( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4reindex( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4remove( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seek( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string key ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekN( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string key, [MarshalAs(UnmanagedType.I2)] short len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekDouble( IntPtr data4, [MarshalAs(UnmanagedType.R8)] double key ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekNext( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string key ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekNextN( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string key, [MarshalAs(UnmanagedType.I2)] short len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekNextDouble( IntPtr data4, [MarshalAs(UnmanagedType.R8)] double key ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekNextUnicodeN( IntPtr data4, [MarshalAs(UnmanagedType.LPWStr)] string key, [MarshalAs(UnmanagedType.I2)] short len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4seekUnicodeN( IntPtr data4, [MarshalAs(UnmanagedType.LPWStr)] string key, [MarshalAs(UnmanagedType.I2)] short len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4skip( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int number ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4tagSync( IntPtr data4, IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4tagSelect( IntPtr data4, IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4tagSelected( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4top( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4unlock( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4writeLow( IntPtr data4,
          [MarshalAs(UnmanagedType.I4)] int number,
          [MarshalAs(UnmanagedType.I4)] int unlock,
          [MarshalAs(UnmanagedType.I4)] int doLock
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4zap( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int first, [MarshalAs(UnmanagedType.I4)] int last ) ;
 
       public Data4() { data = IntPtr.Zero; }
@@ -1641,19 +1656,19 @@ namespace CodeBase
       private IntPtr index ;
       private Data4 D4 ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr i4openW( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int i4close( IntPtr index4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr i4create( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr tagInfo );
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced i4fileName() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced i4fileName() */
       private static extern void i4fileNameW( IntPtr index4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4index( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int i4reindex( IntPtr index4 ) ;
-      //      [DllImport("c4dll.dll")]
+      //      [DllImport(CodeBaseNative.DllName)]
       //      private static extern int i4tag( IntPtr index4, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
 
       public IntPtr cod()     { return code4 ; }
@@ -1743,33 +1758,33 @@ namespace CodeBase
       private IntPtr tag ;
       private IntPtr data ;
 
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced t4alias() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced t4alias() */
       private static extern void t4aliasW( IntPtr tag4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4close( IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short t4descending( IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced t4exprCB() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced t4exprCB() */
       private static extern void t4exprW( IntPtr tag4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced t4filterCB */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced t4filterCB */
       private static extern void t4filterW( IntPtr tag4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4tag(IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string name);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4tagSelected(IntPtr data4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4tagNext( IntPtr data4, IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4tagPrev(IntPtr data4, IntPtr tag4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr t4openLow( IntPtr data4, IntPtr index4, [MarshalAs(UnmanagedType.LPStr)] string name ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4seekN( IntPtr tag4, [MarshalAs(UnmanagedType.LPStr)] string seekValue, [MarshalAs(UnmanagedType.I2)] short len, [MarshalAs(UnmanagedType.I2)] short doDataPosition ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4seekNW( IntPtr tag4, [MarshalAs(UnmanagedType.LPWStr)] string seekValue, [MarshalAs(UnmanagedType.I2)] short len, [MarshalAs(UnmanagedType.I2)] short doDataPosition ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short t4unique( IntPtr tag4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4uniqueSet( IntPtr tag4, [MarshalAs(UnmanagedType.I2)] short unique  ) ;
 
       public Tag4() { tag = IntPtr.Zero; }
@@ -1951,51 +1966,51 @@ namespace CodeBase
 
       private const int r4cdx = 200 ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int code4indexFormat( IntPtr code4  ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int d4lockTest( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int recNo, [MarshalAs(UnmanagedType.I4)] int lockType  ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern byte d4versionCB( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignBytesW( IntPtr field4, [MarshalAs(UnmanagedType.LPArray)] byte[] val, [MarshalAs(UnmanagedType.I4)] int len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignCurrency( IntPtr field4, [MarshalAs(UnmanagedType.LPStr)] string val ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignDateTime( IntPtr field4, [MarshalAs(UnmanagedType.LPStr)] string val ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignDouble( IntPtr field4, [MarshalAs(UnmanagedType.R8)] double val ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignField( IntPtr fieldTo, IntPtr fieldFrom ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignN( IntPtr field4, [MarshalAs(UnmanagedType.LPStr)] string val, [MarshalAs(UnmanagedType.U4)] uint len ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignNotNull( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignNull( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignInt( IntPtr field4, [MarshalAs(UnmanagedType.I4)] int val ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4assignUnicode( IntPtr field4, [MarshalAs(UnmanagedType.LPWStr)] string val ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4bytesW( IntPtr field4, [MarshalAs(UnmanagedType.LPArray)] byte[] val, [MarshalAs(UnmanagedType.I4)] int len ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced f4currency() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced f4currency() */
       private static extern void f4currencyW( IntPtr field4, [MarshalAs(UnmanagedType.I2)] short numDec, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern char f4char( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced f4dateTime() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced f4dateTime() */
       private static extern void f4dateTimeW( IntPtr field4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern double f4double( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4int( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4number( IntPtr field4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced f4str() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced f4str() */
       private static extern void f4strW( IntPtr field4, byte[] buff ) ;
-      [DllImport("c4dll.dll")]   // LY Jun 23/04 : replaced f4strUnicode()
+      [DllImport(CodeBaseNative.DllName)]   // LY Jun 23/04 : replaced f4strUnicode()
       private static extern void f4strUnicodeW( IntPtr field4, [MarshalAs(UnmanagedType.LPWStr)] string buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4true( IntPtr field4 ) ;
 
       public IntPtr cod()              { return code4 ; }
@@ -2246,7 +2261,7 @@ namespace CodeBase
       private IntPtr fldInfo ;
       private int fldInfoSize ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr f4infoAdd(
          IntPtr code4,
          IntPtr fldInfo,
@@ -2256,7 +2271,7 @@ namespace CodeBase
          [MarshalAs(UnmanagedType.I4)] int len,
          [MarshalAs(UnmanagedType.I4)] int dec,
          [MarshalAs(UnmanagedType.I4)] int nulls ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr f4infoInit(
          IntPtr code4,
          [MarshalAs(UnmanagedType.LPStr)] string name,
@@ -2264,17 +2279,17 @@ namespace CodeBase
          [MarshalAs(UnmanagedType.I4)] int len,
          [MarshalAs(UnmanagedType.I4)] int dec,
          [MarshalAs(UnmanagedType.I4)] int nulls ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4infoDel(
          IntPtr code4,
          IntPtr fldInfo,
          [MarshalAs(UnmanagedType.I4)] int fldInfoSize,
          [MarshalAs(UnmanagedType.I4)] int fldNum ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4infoFree(
          IntPtr fldInfo,
          [MarshalAs(UnmanagedType.I4)] int fldInfoSize ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4infoName(
          IntPtr code4,
          IntPtr fldInfo,
@@ -2388,11 +2403,11 @@ namespace CodeBase
 
    public class Tag4info : Error4
    {
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr d4nextIndex(IntPtr code4, IntPtr data4, IntPtr index4);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr i4tagInfo(IntPtr index4) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr t4infoAdd(
          IntPtr code4,
          IntPtr tag4info,
@@ -2402,52 +2417,52 @@ namespace CodeBase
          [MarshalAs(UnmanagedType.LPStr)] string filter,
          [MarshalAs(UnmanagedType.I2)] short unique,
          [MarshalAs(UnmanagedType.U2)] ushort desc ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4infoDel(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int size,
          [MarshalAs(UnmanagedType.I4)] int index ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern ushort t4infoDescend(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int index ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void t4infoExpr(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int index,
          StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void t4infoFilter(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int index,
          StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void t4infoFree(
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int size ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void t4infoFreeInternal(
          IntPtr tag4info);
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void t4infoName(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int index,
          StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int t4infoSize(
          IntPtr code4,
          IntPtr tag4info ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern short t4infoUnique(
          IntPtr code4,
          IntPtr tag4info,
          [MarshalAs(UnmanagedType.I4)] int index ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr t4tagInfo(
          IntPtr tag4);
 
@@ -2633,76 +2648,76 @@ namespace CodeBase
       private IntPtr db ;
       private int currentMemoPos, finalMemoLen ;
 
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoAssign(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPStr)] string val
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4memoAssignBytesW(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPArray)] byte[] val,
          [MarshalAs(UnmanagedType.U4)] uint len
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoAssignN(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPStr)] string val,
          [MarshalAs(UnmanagedType.U4)] uint len
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoAssignUnicode(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPWStr)] string val
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern uint f4memoBytesW(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPArray)] byte[] val,
          [MarshalAs(UnmanagedType.U4)] uint len
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoChanged(
          IntPtr field4
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoFree(
          IntPtr field4
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern uint f4memoLen(
          IntPtr field4
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoReadW(
          IntPtr field4,
          [MarshalAs(UnmanagedType.U4)] uint readLen,
          [MarshalAs(UnmanagedType.U4)] uint startPos,
          StringBuilder buff
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4memoSetLenW(
          IntPtr field4,
          [MarshalAs(UnmanagedType.U4)] uint newLen
          ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced f4memoStr() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced f4memoStr() */
       private static extern void f4memoStrW(
          IntPtr field4,
          byte[] buff
          );
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced f4memoStr() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced f4memoStr() */
       private static extern int f4memoReadPart(
          IntPtr field4,
          byte[] buff,
          [MarshalAs(UnmanagedType.I4)] int readLen,
          [MarshalAs(UnmanagedType.I4)] int startPos
          );
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void f4memoUnicodeStrW(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPWStr)] string buff
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4memoWritePart(
          IntPtr field4,
          [MarshalAs(UnmanagedType.LPStr)] string dataToWrite,
@@ -2710,7 +2725,7 @@ namespace CodeBase
          [MarshalAs(UnmanagedType.I4)] int memoLen,
          [MarshalAs(UnmanagedType.I4)] int offset
          ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int f4memoWriteFinish(
          IntPtr data4
          ) ;
@@ -2829,35 +2844,35 @@ namespace CodeBase
         private int dt ;  // C char pointer
         private int result ; // for ::format(), ::timeNow()
 
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4alloc( [MarshalAs(UnmanagedType.LPStr)]UCT int code4, [MarshalAs(UnmanagedType.LPStr)] string pict ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern void date4assign( int ptr, [MarshalAs(UnmanagedType.I4)] int d ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern void date4assignW( int ptr, [MarshalAs(UnmanagedType.LPStr)] string d ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern string date4cdow( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern string date4cmonth( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4day( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4dow( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern void date4init( int ptr, [MarshalAs(UnmanagedType.LPStr)] string d, [MarshalAs(UnmanagedType.LPStr)] string pict ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern double date4formatMdx( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern string date4formatW( int ptr, int result, [MarshalAs(UnmanagedType.LPStr)] string pict ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4long( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4month( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern string date4timeNowW( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern void date4today( int ptr ) ;
-        [DllImport("c4dll.dll")]
+        [DllImport(CodeBaseNative.DllName)]
         private static extern int date4year( int ptr ) ;
 
         public Date4()
@@ -3034,29 +3049,29 @@ namespace CodeBase
 
    public class Relate4 : Error4
    {
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr relate4createSlave(
          IntPtr relate4,
          IntPtr data4,
          [MarshalAs(UnmanagedType.LPStr)] string masterExpr,
          IntPtr tag );
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr relate4dataCB( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4dataTag( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4doOne( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4errorAction( IntPtr relate4, int value ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr relate4masterCB( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]   /* LY 2002/09/25 : replaced relate4masterExprCB() */
+      [DllImport(CodeBaseNative.DllName)]   /* LY 2002/09/25 : replaced relate4masterExprCB() */
       private static extern void relate4masterExprW( IntPtr relate4, StringBuilder buff ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4matchLen( IntPtr relate4, int value ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4type( IntPtr relate4, int value ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       protected static extern int relate4next( ref IntPtr relate4 ) ;
 
       public Relate4() { relate = IntPtr.Zero; }
@@ -3123,33 +3138,33 @@ namespace CodeBase
 
    public class Relate4set: Relate4
    {
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4bottom( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern void relate4changed( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern uint relate4count( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4doAll( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4eof( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4free( IntPtr relate4, int value ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern IntPtr relate4init( IntPtr data4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4lockAdd( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4optimizeable( IntPtr relate4 ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4querySet( IntPtr relate4, [MarshalAs(UnmanagedType.LPStr)] string query ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4skip( IntPtr relate4, [MarshalAs(UnmanagedType.I4)] int l ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4skipEnable( IntPtr relate4, [MarshalAs(UnmanagedType.I4)] int doEnable ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4sortSet( IntPtr relate4, [MarshalAs(UnmanagedType.LPStr)] string sort ) ;
-      [DllImport("c4dll.dll")]
+      [DllImport(CodeBaseNative.DllName)]
       private static extern int relate4top( IntPtr relate4 ) ;
 
       public Relate4set( Data4 data ) { relate = relate4init( data.dat() ) ; }
