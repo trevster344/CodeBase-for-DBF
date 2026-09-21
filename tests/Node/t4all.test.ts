@@ -153,6 +153,32 @@ describe('t4all CRUD', () => {
    });
 });
 
+describe('integer fields', () => {
+   it('round-trips an I field with assignInt/int', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, [
+            { name: 'STR', type: r4type.str, len: 10 },
+            { name: 'CNT', type: r4type.int, len: 4 }
+         ], [{ name: 'STR', expression: 'STR' }]);
+         data.appendStart(0);
+         data.appendBlank();
+         data.field('STR').assign('X');
+         data.field('CNT').assignInt(1234);
+         data.close();
+
+         data = c4.open(table);
+         data.go(1);
+         expect(data.field('CNT').int()).toBe(1234);
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
 describe('error handling', () => {
    it('throws when opening a missing table', () => {
       const c4 = new Code4({ errOff: 1 });
