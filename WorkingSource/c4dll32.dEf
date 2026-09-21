@@ -466,6 +466,7 @@ EXPORTS
    code4memStartLock
    code4memStartMax
    code4memStartTag
+   code4numCodeBaseCount
    code4optimize
    code4optimizeWrite
    code4ping
