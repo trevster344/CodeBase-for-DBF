@@ -14,8 +14,22 @@ Module Program
     Private haveCount As Boolean = True
 
     Function Main(args As String()) As Integer
+#If EXPECT_X64 Then
+        Const expect64 As Boolean = True
+#Else
+        Const expect64 As Boolean = False
+#End If
+        Dim is64 As Boolean = (IntPtr.Size = 8)
+
         Console.WriteLine("CodeBase VB.NET test")
-        Console.WriteLine("  process bitness : " & If(IntPtr.Size = 8, "x64 (64-bit)", "x86 (32-bit)"))
+        Console.WriteLine("  process bitness : " & If(is64, "x64 (64-bit)", "x86 (32-bit)") & "  (expected " & If(expect64, "x64", "x86") & ")")
+
+        ' Fail if the project was not compiled for the expected bitness. A process can only load a
+        ' native DLL of its own bitness, so this also guarantees the engine matched.
+        If is64 <> expect64 Then
+            Console.WriteLine("  bitness   : FAIL (expected " & If(expect64, "x64", "x86") & " but running " & If(is64, "x64", "x86") & ")")
+            Return 2
+        End If
 
         Dim rc As Integer = 0
         rc = rc Or TestLifecycle()

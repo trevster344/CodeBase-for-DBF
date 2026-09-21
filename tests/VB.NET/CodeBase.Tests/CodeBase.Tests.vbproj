@@ -28,9 +28,11 @@
 
   <PropertyGroup Condition="'$(Platform)'=='x86'">
     <PlatformTarget>x86</PlatformTarget>
+    <DefineConstants>EXPECT_X86</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <PlatformTarget>x64</PlatformTarget>
+    <DefineConstants>EXPECT_X64</DefineConstants>
   </PropertyGroup>
 
   <!-- The VB interface under test, selected by bitness. -->

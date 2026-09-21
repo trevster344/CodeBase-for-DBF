@@ -17,18 +17,51 @@ class Program
 {
    static int Main(string[] args)
    {
+#if X64
+      const bool expect64 = true;
+#else
+      const bool expect64 = false;
+#endif
+      bool is64 = IntPtr.Size == 8;
+
       Console.WriteLine("CodeBase C# test");
-      Console.WriteLine("  process bitness : " + (IntPtr.Size == 8 ? "x64 (64-bit)" : "x86 (32-bit)"));
+      Console.WriteLine("  process bitness : " + (is64 ? "x64 (64-bit)" : "x86 (32-bit)") + "  (expected " + (expect64 ? "x64" : "x86") + ")");
       Console.WriteLine("  import dll      : " + CodeBaseNative.DllName);
-      foreach (System.Diagnostics.ProcessModule m in System.Diagnostics.Process.GetCurrentProcess().Modules)
+
+      // Fail if the project was not compiled for the expected bitness. A process can only load a
+      // native DLL of its own bitness, so this also guarantees the engine matched.
+      if (is64 != expect64)
       {
-         if (m.FileName.IndexOf("c4dll", StringComparison.OrdinalIgnoreCase) >= 0)
-            Console.WriteLine("  loaded module   : " + m.FileName);
+         Console.WriteLine("  bitness   : FAIL (expected " + (expect64 ? "x64" : "x86") + " but running " + (is64 ? "x64" : "x86") + ")");
+         return 2;
       }
+
+      bool moduleSeen = false;
+      string expectedModule = expect64 ? "c4dll64.dll" : "c4dll.dll";
 
       int rc = 0;
       rc |= TestLifecycle();
       rc |= TestCrud();
+
+      // The engine is loaded lazily on the first P/Invoke, so check the module after the tests.
+      foreach (System.Diagnostics.ProcessModule m in System.Diagnostics.Process.GetCurrentProcess().Modules)
+      {
+         if (m.FileName.IndexOf("c4dll", StringComparison.OrdinalIgnoreCase) >= 0)
+         {
+            moduleSeen = true;
+            Console.WriteLine("  loaded module   : " + m.FileName);
+            if (!m.ModuleName.Equals(expectedModule, StringComparison.OrdinalIgnoreCase))
+            {
+               Console.WriteLine("  module    : FAIL (loaded " + m.ModuleName + ", expected " + expectedModule + ")");
+               rc = 2;
+            }
+         }
+      }
+      if (!moduleSeen)
+      {
+         Console.WriteLine("  module    : FAIL (no c4dll module loaded)");
+         rc = 2;
+      }
 
       Console.WriteLine(rc == 0 ? "PASS" : "FAIL");
       return rc;
