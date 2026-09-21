@@ -36,15 +36,15 @@ client application with compatibility set to Visual FoxPro:
 - HDR_VFP_STAND_ALONE_64
 
 You need to copy the appropriate D4ALL.H from one of these directories to WorkingSource in order to get the desired version of C4DLL.DLL.  To help with that
-we provided 4 .BAT files which will copy the appropriate D4ALL.h into WorkingSource to produce the desired result.  Note
+we provided 4 .BAT files (named SetVFP_CLIENT_*.BAT) which will copy the appropriate D4ALL.h into WorkingSource to produce the desired result.  Note
 That there are also 4 different build directories which have vcxproj files geared to compilation by Visual Studio 2022,
 each producing a different output type.  You must use both the correct build directory AND the correct .BAT file to set
 up the appropriate contents of WorkingSource:
 
-- Run: HDR_VFP_SERVER_CLIENT_32.BAT, then use D:\codebase\build\MVStudio_2022_Project_VFP_SERVER_CLIENT_32
-- Run: HDR_VFP_SERVER_CLIENT_64.BAT, then use D:\codebase\build\MVStudio_2022_Project_VFP_SERVER_CLIENT_64
-- Run: HDR_VFP_STAND_ALONE_32.BAT, then use D:\codebase\build\MVStudio_2022_Project_VFP_STAND_ALONE_32
-- Run: HDR_VFP_STAND_ALONE_64.BAT, then use D:\codebase\build\MVStudio_2022_Project_VFP_STAND_ALONE_64
+- Run: SetVFP_CLIENT_SERVER32.BAT, then use build\MVStudio_2022_Project_VFP_SERVER_CLIENT_32
+- Run: SetVFP_CLIENT_SERVER64.BAT, then use build\MVStudio_2022_Project_VFP_SERVER_CLIENT_64
+- Run: SetVFP_CLIENT_SA32.BAT, then use build\MVStudio_2022_Project_VFP_STAND_ALONE_32
+- Run: SetVFP_CLIENT_SA64.BAT, then use build\MVStudio_2022_Project_VFP_STAND_ALONE_64
 
 NOTE ON Compilation for versions OTHER THAN Visual FoxPro:
 This information ONLY applies to Stand-Alone versions of C4DLL.DLL, NOT to Client/Server versions of C4DLL.DLL.  In Client/Server setups,
