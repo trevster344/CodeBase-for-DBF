@@ -1,16 +1,18 @@
-# CodeBase console test projects
+# CodeBase test projects
 
-Runnable C# and VB.NET console tests that verify the CodeBase native engine works when the
-test assembly is compiled for the correct bitness:
+Runnable C#, VB.NET, and Node.js/TypeScript tests that verify the CodeBase native engine works
+when the test process runs at the correct bitness:
 
 | Project | x86 uses | x64 uses |
 |---|---|---|
 | `CSharp/CodeBase.Tests` | `c4dll.dll` (via `interfaces/CSharp/Codebase.cs`) | `c4dll64.dll` |
 | `VB.NET/CodeBase.Tests` | `interfaces/VB.NET/CodeBase.vb` (Integer handles) | `interfaces/VB.NET/CodeBase64.vb` (IntPtr handles) |
+| `Node` | `c4dll.dll` (via `interfaces/Node`, 32-bit Node) | `c4dll64.dll` (64-bit Node) |
 
 Each test reports the process bitness and the loaded native module, runs a 5000-iteration
 `code4init`/`code4initUndo` lifecycle loop (asserting the live-CODE4 count returns to 0), and a
 full CRUD round-trip (create a table + tag, append records, reopen, read/verify, seek by tag).
+The Node suite additionally covers `DBL` (double), `LOG` (logical), and `MEMO` fields.
 Exit code `0` = PASS.
 
 ## 1. Build the native engine DLLs
@@ -49,6 +51,27 @@ dotnet run --project tests/VB.NET/CodeBase.Tests -c Release -f net48  -p:Platfor
 Both `net8.0` and `net48` are targeted; the x86 and x64 .NET runtimes must be installed to run
 the corresponding builds. (The VB x64 build deploys `C4DLL64.dll` renamed to `c4dll.dll`, because
 its `Declare` statements reference that name.)
+
+## 4. Node.js / TypeScript
+
+The Node suite drives the engine through koffi FFI bindings (`interfaces/Node`), which load the
+native DLL at runtime. A process can only load a native DLL of its own bitness, so the x64 test
+needs a 64-bit Node and the x86 test needs a 32-bit Node (the runner reports SKIP if it is missing).
+
+```bash
+# one-time: install the interface dependency and the test toolchain
+npm install --prefix interfaces/Node
+npm install --prefix tests/Node
+
+# type-check the TypeScript test against the interface's index.d.ts
+npm --prefix tests/Node run typecheck
+
+# run (Node >= 22.6 uses built-in type stripping)
+npm --prefix tests/Node test
+```
+
+`tests/Node/run-tests.ps1` wraps the above, points `CODE4_DLL` at the x64 build output, and reports
+SKIP for x86 when no 32-bit Node is installed.
 
 ## Notes
 
