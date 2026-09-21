@@ -203,6 +203,7 @@ const native = {
    // fields
    f4assignN: lib.func('__stdcall', 'f4assignN', 'void', [FIELD4, 'str', 'uint']),
    f4assignDouble: lib.func('__stdcall', 'f4assignDouble', 'void', [FIELD4, 'double']),
+   f4assignInt: lib.func('__stdcall', 'f4assignInt', 'void', [FIELD4, 'int']),
    f4str: lib.func('__stdcall', 'f4str', 'str', [FIELD4]),
    f4double: lib.func('__stdcall', 'f4double', 'double', [FIELD4]),
    f4int: lib.func('__stdcall', 'f4int', 'int', [FIELD4]),
@@ -276,6 +277,11 @@ export class Field4 {
    /** Assign a double value (via f4assignDouble). */
    assignDouble(value: number): void {
       native.f4assignDouble(this._field, Number(value));
+   }
+
+   /** Assign an integer value (via f4assignInt) — use for `I` (integer) fields. */
+   assignInt(value: number): void {
+      native.f4assignInt(this._field, Number(value));
    }
 
    /** Read the field as a string (via f4str). */
