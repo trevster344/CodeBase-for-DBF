@@ -56,7 +56,7 @@ function Build-Native {
 }
 
 function Ensure-Deps {
-   if (-not (Test-Path (Join-Path $ifaceDir "node_modules\koffi"))) {
+   if (-not (Test-Path (Join-Path $ifaceDir "node_modules\typescript"))) {
       Write-Host "== npm install (interfaces/Node) ==" -ForegroundColor Cyan
       & npm install --no-audit --no-fund --prefix $ifaceDir
    }
@@ -64,6 +64,12 @@ function Ensure-Deps {
       Write-Host "== npm install (tests/Node) ==" -ForegroundColor Cyan
       & npm install --no-audit --no-fund --prefix $testsDir
    }
+}
+
+function Build-Interface {
+   Write-Host "== build (interfaces/Node) ==" -ForegroundColor Cyan
+   & npm --prefix $ifaceDir run build
+   if ($LASTEXITCODE -ne 0) { throw "interface build failed" }
 }
 
 function Get-NodeArch([string]$exe) {
@@ -101,10 +107,18 @@ function Run-Node([string]$exe, [string]$dll, [string]$label) {
 
 if ($BuildNative) { Build-Native }
 Ensure-Deps
+Build-Interface
 
 Write-Host "== typecheck ==" -ForegroundColor Cyan
 & (Join-Path $testsDir "node_modules\.bin\tsc.cmd") -p (Join-Path $testsDir "tsconfig.json")
 if ($LASTEXITCODE -ne 0) { throw "TypeScript typecheck failed" }
+
+Write-Host "== vitest (t4all CRUD/lifecycle) ==" -ForegroundColor Cyan
+Push-Location $testsDir
+& (Join-Path $testsDir "node_modules\.bin\vitest.cmd") run
+$vitestRc = $LASTEXITCODE
+Pop-Location
+if ($vitestRc -ne 0) { throw "vitest failed" }
 
 $node64 = Resolve-Node $Node64 "x64"
 $node32 = Resolve-Node $Node32 "ia32"

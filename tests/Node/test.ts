@@ -1,8 +1,11 @@
-import type * as Codebase from '../../interfaces/Node';
+import * as cb from '../../interfaces/Node/dist/index.js';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 /*
  * CodeBase Node/TypeScript test - runnable console test for the CodeBase native engine through the
- * interfaces/Node koffi bindings.
+ * interfaces/Node koffi bindings (ESM).
  *
  * Verifies that the engine works when Node's bitness matches the native DLL:
  *   x64  -> c4dll64.dll
@@ -13,11 +16,6 @@ import type * as Codebase from '../../interfaces/Node';
  * fields (create table + tag, append records, reopen, read/verify, seek by tag).
  * Exit code 0 = PASS, non-zero = FAIL.
  */
-
-const cb: typeof Codebase = require('../../interfaces/Node');
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
 
 const expectX64 = (process.env.EXPECT_ARCH || 'x64') === 'x64';
 
@@ -71,18 +69,18 @@ function testCrud(): number {
    const table = path.join(dir, 'CRUDTEST');
    deleteTable(table);
 
-   let c4: Codebase.Code4 | null = null;
+   let c4: cb.Code4 | null = null;
    try {
       c4 = new cb.Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 0 });
 
-      const fields: Codebase.FieldDef[] = [
+      const fields: cb.FieldDef[] = [
          { name: 'STR', type: cb.r4type.str, len: 10 },
          { name: 'NUM', type: cb.r4type.num, len: 5 },
          { name: 'DBL', type: cb.r4type.double, len: 8 },
          { name: 'LOG', type: cb.r4type.log, len: 1 },
          { name: 'MEMO', type: cb.r4type.memo, len: 10 }
       ];
-      const tags: Codebase.TagDef[] = [{ name: 'STR', expression: 'STR' }];
+      const tags: cb.TagDef[] = [{ name: 'STR', expression: 'STR' }];
 
       let data = c4.create(table, fields, tags);
       if (!data.isValid()) {

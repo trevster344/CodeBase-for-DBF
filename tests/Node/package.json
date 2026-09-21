@@ -1,16 +1,22 @@
 {
   "name": "codebase-node-tests",
   "version": "0.1.0",
-  "description": "Node.js / TypeScript console tests for the CodeBase FFI bindings (interfaces/Node)",
+  "description": "Node.js / TypeScript console and Vitest tests for the CodeBase FFI bindings (interfaces/Node)",
+  "type": "module",
   "private": true,
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings test.ts",
-    "test:x64": "node --experimental-strip-types --no-warnings test.ts"
+    "test:x64": "node --experimental-strip-types --no-warnings test.ts",
+    "test:unit": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
