@@ -1,34 +1,36 @@
-# CodeBase Node.js interface
+# @trevster344/codebase
 
-Node.js FFI bindings for the CodeBase native engine (`c4dll.dll` / `c4dll64.dll`), with TypeScript
-typings (`index.d.ts`).
+ESM FFI bindings (with TypeScript types) for the CodeBase native engine (`c4dll.dll` /
+`c4dll64.dll`). Written in TypeScript; the published package ships the compiled `dist/`.
 
 It uses [koffi](https://koffi.dev) to call the exported C API. The library is loaded at runtime, so
 the same module targets the 32-bit `c4dll.dll` under 32-bit Node or the 64-bit `c4dll64.dll` under
 64-bit Node. A process can only load a native DLL of its own bitness, so `process.arch` selects the
 file name.
 
-## Install
+## Install (GitHub Packages)
 
-```bash
-npm install            # installs koffi
+Add an `.npmrc` with a token that can read the package, then install:
+
+```ini
+@trevster344:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
-The wrapper itself has a single dependency (`koffi`); TypeScript consumers get the bundled
-`index.d.ts` automatically.
+```bash
+npm install @trevster344/codebase
+```
 
 ## Usage
 
-JavaScript (CommonJS):
-
 ```js
-const cb = require('./interfaces/Node');
+import { Code4, r4type } from '@trevster344/codebase';
 
-const c4 = new cb.Code4({ compatibility: 30, safety: 0, errOff: 1 });
+const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
 try {
    const data = c4.create('C:/temp/PEOPLE', [
-      { name: 'NAME', type: cb.r4type.str, len: 30 },
-      { name: 'AGE', type: cb.r4type.num, len: 3 }
+      { name: 'NAME', type: r4type.str, len: 30 },
+      { name: 'AGE', type: r4type.num, len: 3 }
    ], [{ name: 'NAME', expression: 'NAME' }]);
 
    data.appendStart(0);
@@ -41,26 +43,24 @@ try {
 }
 ```
 
-TypeScript:
+TypeScript consumers get the generated `dist/index.d.ts`:
 
 ```ts
-import type * as Codebase from './interfaces/Node';
-const cb: typeof Codebase = require('./interfaces/Node');
-
-const c4 = new cb.Code4({ errOff: 1 }); // cb.Code4 is typed
-// ...
-c4.dispose();
+import { Code4, r4type, type FieldDef } from '@trevster344/codebase';
 ```
 
 `dispose()` is idempotent and also implements `Symbol.dispose`, so TypeScript 5.2+ supports
-`using c4 = new cb.Code4();`.
+`using c4 = new Code4();`.
+
+> ESM only. `import` works on Node 16+; CommonJS `require()` needs Node ≥ 22.12 (where `require(esm)`
+> is enabled by default).
 
 ## API
 
 | Export | Description |
 |---|---|
 | `Code4` | `new Code4(options?)`; `open(name)`, `create(name, fields, tags?)`, `errorCode`, `errorText(code?)`, `dispose()` |
-| `Data4` | `appendStart(memo?)`, `appendBlank()`, `field(name)`, `go(recNo)`, `seek(key)`, `recCount()`, `numFields()`, `isValid()`, `close()` |
+| `Data4` | `appendStart(memo?)`, `appendBlank()`, `field(name)`, `go(recNo)`, `select(tagName)`, `seek(key)`, `recCount()`, `numFields()`, `isValid()`, `close()` |
 | `Field4` | `assign(v)`, `assignDouble(v)`, `str()`, `double()`, `int()`, `memoAssign(v)`, `memoStr()`, `memoLen()` |
 | `numCodeBaseInstances()` | live CODE4 count (`code4numCodeBaseCount`), or `null` if the export is missing |
 | `r4success`, `r4type` | error code and field type codes |
@@ -79,8 +79,33 @@ The native DLL is located in this order:
 4. The current working directory, then this module's directory.
 5. Otherwise the bare file name, letting the OS loader search `PATH`.
 
+## Development
+
+```bash
+npm install
+npm run build     # tsc -> dist/index.js + dist/index.d.ts
+```
+
+The TypeScript source is `index.ts`; only `dist/` is published (see `files` in `package.json`).
+
+## Publishing
+
+`prepare` runs the build, so packing/publishing always ships a fresh `dist/`:
+
+```ini
+# .npmrc (this folder or the repo root); token needs write:packages
+@trevster344:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+```bash
+npm publish
+```
+
 ## Notes
 
 - Strings are passed as ANSI (`char *`); field data is copied through `f4assignN` / `f4memoAssignN`.
 - Memo fields use the dedicated `f4memoAssignN` / `f4memoStr` entry points.
 - Errors are returned as codes; set `errOff: 1` to suppress dialogs (recommended for servers).
+- Licensed LGPL-3.0-or-later (see `LICENSE`). The CodeBase engine is © Sequiter Inc. (see the
+  repository `LICENSE.txt`).

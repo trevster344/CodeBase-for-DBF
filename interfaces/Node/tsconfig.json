@@ -5,11 +5,13 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022", "ESNext.Disposable"],
     "types": ["node"],
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": ".",
     "strict": true,
-    "noEmit": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["test.ts", "t4all.test.ts", "vitest.config.ts"]
+  "include": ["index.ts"]
 }

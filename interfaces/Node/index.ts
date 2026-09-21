@@ -1,5 +1,3 @@
-'use strict';
-
 /*
  * Node.js FFI bindings for the CodeBase native engine (c4dll.dll / c4dll64.dll).
  *
@@ -12,16 +10,20 @@
  * field assign/read, go/seek/recCount.
  */
 
-const fs = require('fs');
-const path = require('path');
-const koffi = require('koffi');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import koffi from 'koffi';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /* ------------------------------------------------------------------ constants */
 
-const r4success = 0;
+/** r4success error code. */
+export const r4success = 0;
 
-// Field type codes (char), matching interfaces/CSharp/Codebase.cs.
-const r4type = {
+/** CodeBase field type codes (char), mirroring interfaces/CSharp/Codebase.cs. */
+export const r4type = {
    bin: 'B',
    double: 'B',
    str: 'C',
@@ -34,36 +36,91 @@ const r4type = {
    num: 'N',
    dateTime: 'T',
    currency: 'Y'
-};
+} as const;
+
+/** Options applied to a freshly initialized CODE4 (via code4compatibility/safety/errOff/readOnly). */
+export interface Code4Options {
+   compatibility?: number;
+   safety?: number;
+   errOff?: number;
+   readOnly?: number;
+}
+
+/** A FIELD4INFO entry for {@link Code4.create}. `type` is a CodeBase type code (see {@link r4type}). */
+export interface FieldDef {
+   name: string;
+   type: string | number;
+   len?: number;
+   dec?: number;
+   nulls?: number;
+}
+
+/** A TAG4INFO entry for {@link Code4.create}. */
+export interface TagDef {
+   name: string;
+   expression?: string;
+   filter?: string;
+   unique?: number;
+   descending?: number;
+}
 
 /* ------------------------------------------------------------- library resolve */
 
-function is64Bit() {
+function is64Bit(): boolean {
    return process.arch === 'x64';
 }
 
-function dllName() {
+function resolveDllName(): string {
    if (process.arch === 'x64') return 'c4dll64.dll';
    if (process.arch === 'ia32') return 'c4dll.dll';
    throw new Error("Unsupported Node architecture '" + process.arch + "' (need x64 or ia32)");
 }
 
-// Search order: explicit path -> CODE4_DLL -> CODE4_DLL_DIR -> repo build output -> cwd -> module dir.
-function resolveLibrary(explicit) {
+// Walk up from this module looking for the repo's native build output (works from both the
+// TypeScript source and the compiled dist/ layout).
+function findInRepoBuild(name: string): string | null {
+   const project = is64Bit()
+      ? path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
+      : path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32');
+
+   let dir = __dirname;
+   for (let i = 0; i < 6; i++) {
+      const candidate = path.join(dir, project, name);
+      if (fs.existsSync(candidate)) return candidate;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+   }
+   return null;
+}
+
+// The native engines bundled with the published package: native/<arch>/<dll>.
+function findBundled(name: string): string | null {
+   const arch = is64Bit() ? 'x64' : 'x86';
+   const candidate = path.join(__dirname, '..', 'native', arch, name);
+   return fs.existsSync(candidate) ? candidate : null;
+}
+
+// Search order: explicit path -> CODE4_DLL -> CODE4_DLL_DIR -> bundled native/ -> repo build
+// output -> cwd -> module dir.
+function resolveLibrary(explicit?: string): string {
    if (explicit) return explicit;
    if (process.env.CODE4_DLL) return process.env.CODE4_DLL;
 
-   const name = dllName();
-   const root = path.resolve(__dirname, '..', '..');
-   const buildDir = is64Bit()
-      ? path.join(root, 'build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
-      : path.join(root, 'build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32');
+   const name = resolveDllName();
 
-   const dirs = [];
-   if (process.env.CODE4_DLL_DIR) dirs.push(process.env.CODE4_DLL_DIR);
-   dirs.push(buildDir, process.cwd(), __dirname);
+   if (process.env.CODE4_DLL_DIR) {
+      const candidate = path.join(process.env.CODE4_DLL_DIR, name);
+      if (fs.existsSync(candidate)) return candidate;
+   }
 
-   for (const dir of dirs) {
+   const bundled = findBundled(name);
+   if (bundled) return bundled;
+
+   const fromRepo = findInRepoBuild(name);
+   if (fromRepo) return fromRepo;
+
+   for (const dir of [process.cwd(), __dirname]) {
       const candidate = path.join(dir, name);
       if (fs.existsSync(candidate)) return candidate;
    }
@@ -72,7 +129,12 @@ function resolveLibrary(explicit) {
    return name;
 }
 
-const libraryPath = resolveLibrary(process.env.CODE4_DLL);
+/** Absolute path of the native library that was loaded. */
+export const libraryPath = resolveLibrary(process.env.CODE4_DLL);
+
+/** File name of the native library selected for the current process bitness. */
+export const dllName = resolveDllName();
+
 const lib = koffi.load(libraryPath);
 
 /* --------------------------------------------------------------------- types */
@@ -80,6 +142,7 @@ const lib = koffi.load(libraryPath);
 const CODE4 = koffi.pointer('CODE4', koffi.opaque());
 const DATA4 = koffi.pointer('DATA4', koffi.opaque());
 const FIELD4 = koffi.pointer('FIELD4', koffi.opaque());
+const TAG4 = koffi.pointer('TAG4', koffi.opaque());
 
 // typedef struct { char *name; short type; unsigned short len, dec, nulls; } FIELD4INFO ;
 const FIELD4INFO = koffi.struct('FIELD4INFO', {
@@ -123,12 +186,17 @@ const native = {
    // data files
    d4open: lib.func('__stdcall', 'd4open', DATA4, [CODE4, 'str']),
    d4create: lib.func('__stdcall', 'd4create', DATA4, [CODE4, 'str', CODE4INFO, TAG4INFOP]),
+   // Build TAG4INFO arrays with the engine helper: the array and its strings are engine-allocated,
+   // which avoids passing a raw struct array whose string fields the engine later walks.
+   t4infoAdd: lib.func('__stdcall', 't4infoAdd', TAG4INFOP, [CODE4, TAG4INFOP, 'int', 'str', 'str', 'str', 'int16', 'uint16']),
    d4close: lib.func('__stdcall', 'd4close', 'int', [DATA4]),
    d4appendStart: lib.func('__stdcall', 'd4appendStart', 'int16', [DATA4, 'int16']),
    d4appendBlank: lib.func('__stdcall', 'd4appendBlank', 'int', [DATA4]),
    d4field: lib.func('__stdcall', 'd4field', FIELD4, [DATA4, 'str']),
    d4goLow: lib.func('__stdcall', 'd4goLow', 'int', [DATA4, 'int32_t', 'int16']),
    d4seek: lib.func('__stdcall', 'd4seek', 'int', [DATA4, 'str']),
+   d4tag: lib.func('__stdcall', 'd4tag', TAG4, [DATA4, 'str']),
+   d4tagSelect: lib.func('__stdcall', 'd4tagSelect', 'void', [DATA4, TAG4]),
    d4recCountDo2: lib.func('__stdcall', 'd4recCountDo2', 'int32_t', [DATA4, 'uint8']),
    d4numFields: lib.func('__stdcall', 'd4numFields', 'int16', [DATA4]),
 
@@ -147,30 +215,34 @@ const native = {
 };
 
 // code4numCodeBaseCount() was added with the lifecycle fix; tolerate engines that lack it.
-let _numCodeBaseCount = null;
+let _numCodeBaseCount: ((...args: any[]) => any) | null = null;
 try {
    _numCodeBaseCount = lib.func('__stdcall', 'code4numCodeBaseCount', 'uint', []);
-} catch (e) {
+} catch {
    _numCodeBaseCount = null;
 }
 
-function numCodeBaseInstances() {
+/**
+ * Number of live CODE4 instances (code4numCodeBaseCount).
+ * Returns `null` when the loaded engine does not export the diagnostic.
+ */
+export function numCodeBaseInstances(): number | null {
    return _numCodeBaseCount ? _numCodeBaseCount() : null;
 }
 
 /* ------------------------------------------------------------------- helpers */
 
-function isNullPtr(p) {
+function isNullPtr(p: any): boolean {
    return p == null || p === 0 || p === 0n;
 }
 
-function typeCode(type) {
+function typeCode(type: string | number): number {
    if (typeof type === 'number') return type;
    if (typeof type === 'string' && type.length > 0) return type.charCodeAt(0);
    throw new Error('field type must be a char code or a one-character string');
 }
 
-function fieldInfoArray(fields) {
+function fieldInfoArray(fields: FieldDef[]): unknown[] {
    const arr = fields.map((f) => ({
       name: f.name,
       type: typeCode(f.type),
@@ -178,72 +250,75 @@ function fieldInfoArray(fields) {
       dec: f.dec || 0,
       nulls: f.nulls || 0
    }));
-   arr.push({ name: null, type: 0, len: 0, dec: 0, nulls: 0 }); // null terminator
-   return arr;
-}
-
-function tagInfoArray(tags) {
-   if (!tags || tags.length === 0) return null;
-   const arr = tags.map((t) => ({
-      name: t.name,
-      expression: t.expression || t.name,
-      filter: t.filter || '',
-      unique: t.unique || 0,
-      descending: t.descending || 0
-   }));
-   arr.push({ name: null, expression: null, filter: null, unique: 0, descending: 0 });
+   arr.push({ name: null, type: 0, len: 0, dec: 0, nulls: 0 } as any); // null terminator
    return arr;
 }
 
 /* -------------------------------------------------------------------- Field4 */
 
-class Field4 {
-   constructor(data, name) {
+/** A field handle within an open data file. */
+export class Field4 {
+   private _field: bigint;
+
+   constructor(data: Data4, name: string) {
       this._field = native.d4field(data.handle, name);
       if (isNullPtr(this._field)) {
          throw new Error("d4field('" + name + "') failed: " + data.errorText());
       }
    }
 
-   assign(value) {
+   /** Assign a string value (ANSI, via f4assignN). */
+   assign(value: string | number): void {
       const s = String(value);
       native.f4assignN(this._field, s, Buffer.byteLength(s));
    }
 
-   assignDouble(value) {
+   /** Assign a double value (via f4assignDouble). */
+   assignDouble(value: number): void {
       native.f4assignDouble(this._field, Number(value));
    }
 
-   str() {
+   /** Read the field as a string (via f4str). */
+   str(): string {
       return native.f4str(this._field);
    }
 
-   double() {
+   /** Read the field as a double (via f4double). */
+   double(): number {
       return native.f4double(this._field);
    }
 
-   int() {
+   /** Read the field as an integer (via f4int). */
+   int(): number {
       return native.f4int(this._field);
    }
 
-   memoAssign(value) {
+   /** Assign a memo value (via f4memoAssignN). */
+   memoAssign(value: string): void {
       const s = String(value);
       native.f4memoAssignN(this._field, s, Buffer.byteLength(s));
    }
 
-   memoStr() {
+   /** Read a memo value (via f4memoStr). */
+   memoStr(): string {
       return native.f4memoStr(this._field);
    }
 
-   memoLen() {
+   /** Length of the memo value (via f4memoLen). */
+   memoLen(): number {
       return native.f4memoLen(this._field);
    }
 }
 
 /* --------------------------------------------------------------------- Data4 */
 
-class Data4 {
-   constructor(code4, handle) {
+/** An open DATA4 (data file). */
+export class Data4 {
+   private _code4: Code4;
+   private _handle: bigint | null;
+   private _closed: boolean;
+
+   constructor(code4: Code4, handle: bigint) {
       this._code4 = code4;
       this._handle = handle;
       this._closed = false;
@@ -252,47 +327,57 @@ class Data4 {
       }
    }
 
-   get handle() {
-      return this._handle;
+   /** Opaque native DATA4 pointer. */
+   get handle(): bigint {
+      return this._handle!;
    }
 
-   isValid() {
+   isValid(): boolean {
       return !isNullPtr(this._handle);
    }
 
-   errorText() {
+   errorText(): string {
       return this._code4.errorText();
    }
 
-   appendStart(memo) {
+   appendStart(memo?: number): number {
       return native.d4appendStart(this._handle, memo || 0);
    }
 
-   appendBlank() {
+   appendBlank(): number {
       return native.d4appendBlank(this._handle);
    }
 
-   field(name) {
+   field(name: string): Field4 {
       return new Field4(this, name);
    }
 
-   go(recNo) {
+   go(recNo: number): number {
       return native.d4goLow(this._handle, recNo, 1);
    }
 
-   seek(key) {
+   seek(key: string): number {
       return native.d4seek(this._handle, key);
    }
 
-   recCount() {
+   /** Select the active tag by name (d4tag + d4tagSelect), as needed before {@link seek}. */
+   select(tagName: string): void {
+      const tag = native.d4tag(this._handle, tagName);
+      if (isNullPtr(tag)) {
+         throw new Error("d4tag('" + tagName + "') failed: " + this.errorText());
+      }
+      native.d4tagSelect(this._handle, tag);
+   }
+
+   recCount(): number {
       return native.d4recCountDo2(this._handle, 0);
    }
 
-   numFields() {
+   numFields(): number {
       return native.d4numFields(this._handle);
    }
 
-   close() {
+   close(): number {
       if (this._closed) return r4success;
       this._closed = true;
       const rc = native.d4close(this._handle);
@@ -303,8 +388,12 @@ class Data4 {
 
 /* --------------------------------------------------------------------- Code4 */
 
-class Code4 {
-   constructor(options) {
+/** A CODE4 instance; the entry point to the engine. */
+export class Code4 {
+   private _handle: bigint | null;
+   private _disposed: boolean;
+
+   constructor(options?: Code4Options) {
       options = options || {};
       this._handle = native.code4initVB();
       this._disposed = false;
@@ -317,57 +406,88 @@ class Code4 {
       if (options.readOnly !== undefined) native.code4readOnly(this._handle, options.readOnly);
    }
 
-   get handle() {
-      return this._handle;
+   /** Opaque native CODE4 pointer. */
+   get handle(): bigint {
+      return this._handle!;
    }
 
-   get errorCode() {
+   /** Current error code (via code4errorCode). */
+   get errorCode(): number {
       return native.code4errorCode(this._handle, -5);
    }
 
-   errorText(code) {
+   /** Error description for `code` (or the current error). */
+   errorText(code?: number): string {
       const c = code === undefined ? this.errorCode : code;
       return native.error4text(this._handle, c);
    }
 
-   open(name) {
+   /** Open an existing data file. */
+   open(name: string): Data4 {
       return new Data4(this, native.d4open(this._handle, name));
    }
 
-   create(name, fields, tags) {
-      const handle = native.d4create(
-         this._handle,
-         name,
-         fieldInfoArray(fields),
-         tagInfoArray(tags)
-      );
+   /** Create a new data file with the given fields and optional tags. */
+   create(name: string, fields: FieldDef[], tags?: TagDef[] | null): Data4 {
+      let tagInfo: bigint | null = null;
+      if (tags && tags.length > 0) {
+         for (let i = 0; i < tags.length; i++) {
+            const t = tags[i];
+            tagInfo = native.t4infoAdd(
+               this._handle,
+               tagInfo,
+               i,
+               t.name,
+               t.expression || t.name,
+               t.filter || '',
+               t.unique || 0,
+               t.descending || 0
+            );
+            if (isNullPtr(tagInfo)) {
+               throw new Error('t4infoAdd failed: ' + this.errorText());
+            }
+         }
+      }
+      const handle = native.d4create(this._handle, name, fieldInfoArray(fields), tagInfo);
       return new Data4(this, handle);
    }
 
-   dispose() {
+   /** Release the CODE4 (code4initUndo). Idempotent. */
+   dispose(): void {
       if (this._disposed) return;
       this._disposed = true;
       native.code4initUndo(this._handle);
       this._handle = null;
    }
 
-   [Symbol.dispose]() {
+   [Symbol.dispose](): void {
       this.dispose();
    }
 }
 
 /* -------------------------------------------------------------------- exports */
 
-module.exports = {
+/** The koffi module instance used by the bindings. */
+export { koffi };
+
+/** Raw koffi struct type for FIELD4INFO. */
+export const Field4info = FIELD4INFO;
+
+/** Raw koffi struct type for TAG4INFO. */
+export const Tag4info = TAG4INFO;
+
+const api = {
    koffi,
    libraryPath,
-   dllName: dllName(),
+   dllName,
    numCodeBaseInstances,
    Code4,
    Data4,
    Field4,
    r4success,
    r4type,
-   Field4info: FIELD4INFO,
-   Tag4info: TAG4INFO
+   Field4info,
+   Tag4info
 };
+
+export default api;
