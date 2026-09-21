@@ -1689,4 +1689,63 @@ Module CodeBase
 
         RTrimNulls = str_Renamed
     End Function
+
+#If Not USE_D4DLL Then
+    ''' <summary>
+    ''' Owns a CODE4 handle returned by code4init() and releases it via code4initUndo() when
+    ''' disposed. Use this (or an equivalent SafeHandle) in long-lived host processes so a CODE4
+    ''' is never leaked if the caller forgets to call code4initUndo().
+    ''' </summary>
+    ''' <remarks>
+    ''' This is the 32-bit version: the handle is a native pointer that fits in an Integer. See
+    ''' CodeBase64.vb for the 64-bit version, which uses IntPtr. code4init()/code4initUndo() are
+    ''' the raw native alloc/free pair; if Dispose() is skipped (e.g. an exception unwinds between
+    ''' init and the manual undo) the CODE4 and the CodeBase memory pools it references are
+    ''' retained, so a web worker process that repeats this per request grows until it fails. This
+    ''' wrapper makes release deterministic: Dispose() undoes immediately, and the finalizer is a
+    ''' backstop if the object is collected without being disposed.
+    ''' </remarks>
+    Public Class Code4Handle
+        Implements IDisposable
+
+        ' The native CODE4 pointer. Valid when it is greater than zero.
+        Public ReadOnly Property Handle As Integer
+        ' Guards against double release (Dispose() may be called more than once, and the
+        ' finalizer may run after Dispose()).
+        Private _disposed As Boolean
+
+        Public Sub New()
+            Handle = CodeBase.code4init()
+            ' A non-positive handle means native initialization failed (e.g. the global memory
+            ' manager refused to allocate). Fail fast rather than passing a bad pointer on.
+            If Handle <= 0 Then
+                Throw New InvalidOperationException("code4init() did not return a valid CODE4 handle.")
+            End If
+        End Sub
+
+        Public Sub Dispose() Implements IDisposable.Dispose
+            If Not _disposed Then
+                ' Release the native CODE4 exactly once.
+                If Handle > 0 Then
+                    CodeBase.code4initUndo(Handle)
+                End If
+                _disposed = True
+                ' Dispose() already released the handle, so suppress the finalizer.
+                GC.SuppressFinalize(Me)
+            End If
+        End Sub
+
+        Protected Overrides Sub Finalize()
+            ' Backstop for callers that never Dispose(): release the native handle if it is still
+            ' owned. _disposed prevents a double release when Dispose() already ran.
+            Try
+                If Not _disposed AndAlso Handle > 0 Then
+                    CodeBase.code4initUndo(Handle)
+                End If
+            Finally
+                MyBase.Finalize()
+            End Try
+        End Sub
+    End Class
+#End If
 End Module
