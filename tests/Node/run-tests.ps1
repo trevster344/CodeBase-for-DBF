@@ -105,6 +105,20 @@ function Run-Node([string]$exe, [string]$dll, [string]$label) {
    }
 }
 
+function Run-Cjs([string]$exe, [string]$dll, [string]$label) {
+   if (-not $exe) { Write-Host ("{0,-4} : SKIP (no {0} Node found)" -f $label) -ForegroundColor Yellow; return 0 }
+   if (-not (Test-Path $dll)) { Write-Host ("{0,-4} : SKIP (missing {1})" -f $label, $dll) -ForegroundColor Yellow; return 0 }
+   Write-Host "== $label cjs ($exe) ==" -ForegroundColor Cyan
+   $prev = $env:CODE4_DLL
+   $env:CODE4_DLL = $dll
+   try {
+      & $exe (Join-Path $testsDir "cjs.test.cjs") | Out-Host
+      return $LASTEXITCODE
+   } finally {
+      $env:CODE4_DLL = $prev
+   }
+}
+
 if ($BuildNative) { Build-Native }
 Ensure-Deps
 Build-Interface
@@ -126,6 +140,9 @@ $node32 = Resolve-Node $Node32 "ia32"
 $rc64 = Run-Node $node64 (Join-Path $root "build\MVStudio_2022_Project_VFP_STAND_ALONE_64\C4dll64.dll") "x64"
 $rc32 = Run-Node $node32 (Join-Path $root "build\MVStudio_2022_Project_VFP_STAND_ALONE_32\C4dll.dll") "x86"
 
-if ($rc64 -ne 0 -or $rc32 -ne 0) { exit 1 }
+$cjs64 = Run-Cjs $node64 (Join-Path $root "build\MVStudio_2022_Project_VFP_STAND_ALONE_64\C4dll64.dll") "x64"
+$cjs32 = Run-Cjs $node32 (Join-Path $root "build\MVStudio_2022_Project_VFP_STAND_ALONE_32\C4dll.dll") "x86"
+
+if ($rc64 -ne 0 -or $rc32 -ne 0 -or $cjs64 -ne 0 -or $cjs32 -ne 0) { exit 1 }
 Write-Host "PASS" -ForegroundColor Green
 exit 0

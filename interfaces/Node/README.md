@@ -1,8 +1,8 @@
 # @trevster344/codebase
 
-Node.js (ESM) FFI bindings for the **CodeBase** native engine (`c4dll.dll` / `c4dll64.dll`), with
-TypeScript types. It calls the exported C API in-process through [koffi](https://koffi.dev) — no
-server, no ODBC, no extra process.
+Node.js FFI bindings (ESM + CommonJS) for the **CodeBase** native engine (`c4dll.dll` /
+`c4dll64.dll`), with TypeScript types. It calls the exported C API in-process through
+[koffi](https://koffi.dev) — no server, no ODBC, no extra process.
 
 The package bundles the engines for **Windows (x64/ia32)** and **Linux (x64/arm64)** under
 `native/<platform>-<arch>/` and picks the one matching `process.platform` + `process.arch` at runtime.
@@ -10,7 +10,7 @@ The package bundles the engines for **Windows (x64/ia32)** and **Linux (x64/arm6
 - Create, open, read and write DBF/CDX tables.
 - Full CODE4 lifecycle (`code4initVB` / `code4initUndo`) exposed as `Code4` + `dispose()`.
 - Typed: ships `dist/index.d.ts`.
-- ESM, Node ≥ 20, Windows and Linux.
+- ESM (`import`) and CommonJS (`require`), Node ≥ 20, Windows and Linux.
 
 ---
 
@@ -39,7 +39,7 @@ The package bundles the engines for **Windows (x64/ia32)** and **Linux (x64/arm6
 | | |
 |---|---|
 | OS | **Windows** (x64/ia32) and **Linux** (x64/arm64) |
-| Node.js | **≥ 20** (ESM). `import` works from Node 16; CommonJS `require()` needs Node ≥ 22.12 |
+| Node.js | **≥ 20**. Both `import` (ESM) and `require()` (CommonJS) are supported |
 | Bitness | the Node process must match the engine (a process can only load its own bitness) |
 
 The native engines are self-contained; there is nothing else to install.
@@ -562,13 +562,15 @@ c4.dispose();
 
 ### CommonJS
 
-The package is ESM-only. Under Node ≥ 22.12 `require()` of ESM works:
+The package ships a dedicated CommonJS build (`dist/index.cjs`), so `require()` works on every
+supported Node (≥ 20) — it does not depend on Node ≥ 22.12 `require(esm)`:
 
 ```js
 const { Code4, r4type } = require('@trevster344/codebase');
 ```
 
-Older Node should use `import` (or dynamic `await import('@trevster344/codebase')`).
+`import` and `require()` expose the same named exports; a default export carrying the same members
+is provided for both (`const cb = require('@trevster344/codebase'); cb.default.Code4 === cb.Code4`).
 
 ---
 
@@ -637,8 +639,9 @@ Point `CODE4_DLL` at the exact file if needed.
 Node is running on a platform/arch the package does not ship an engine for. Supported:
 `win32-x64`, `win32-ia32`, `linux-x64`, `linux-arm64`.
 
-**`Cannot use import statement outside a module` / `require of ES Module`**
-The package is ESM. Use `import`, or Node ≥ 22.12 for `require()`.
+**`Cannot use import statement outside a module`**
+You are loading the ESM entry (`dist/index.js`) from a CommonJS context. Use
+`require('@trevster344/codebase')` (which resolves to `dist/index.cjs`) or `import` it from ESM.
 
 **npm blocks koffi's install script**
 Approve it once: `npm install-scripts approve koffi`. koffi needs to place its prebuilt binding.
@@ -657,7 +660,7 @@ yourself. `str(false)` always returns the raw value.
 
 ```bash
 npm install
-npm run build         # tsc -> dist/ (index.js + index.d.ts)
+npm run build         # tsc -> dist/index.js + index.d.ts (ESM/types); esbuild -> dist/index.cjs (CJS)
 npm run bundle-native # stage the built engines into native/<platform>-<arch>/
 npm pack --dry-run    # inspect the published tarball
 ```

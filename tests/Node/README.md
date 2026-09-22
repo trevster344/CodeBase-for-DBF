@@ -12,6 +12,10 @@ loop (asserting `code4numCodeBaseCount()` returns to 0 each cycle), and a full C
 
 Exit code `0` = PASS.
 
+`cjs.test.cjs` is the CommonJS counterpart: it `require()`s `interfaces/Node/dist/index.cjs`,
+checks the named/default exports and `libraryPath`, and runs a create/append/reopen/read/seek
+round-trip. It is run for both bitnesses by the PowerShell wrapper.
+
 ## Requirements
 
 - Node.js >= 22.6 (uses built-in TypeScript type stripping to run `test.ts` directly).
@@ -30,6 +34,9 @@ npm --prefix tests/Node run typecheck
 
 # run (x64 by default)
 npm --prefix tests/Node test
+
+# run the CommonJS (require) smoke test
+npm --prefix tests/Node run test:cjs
 ```
 
 Or use the PowerShell wrapper, which builds the native DLLs, installs deps, type-checks, and runs

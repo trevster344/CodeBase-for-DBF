@@ -15,7 +15,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import koffi from 'koffi';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Directory of this module. `import.meta.url` is native to the ESM build; the CommonJS build
+// (scripts/build-cjs.mjs) rewrites it to a `__filename`-based file URL so no `import.meta` remains.
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 /* ------------------------------------------------------------------ constants */
 
@@ -133,7 +135,7 @@ function findInRepoBuild(name: string): string | null {
       projects.push(path.join('linux', 'build'), path.join('linux', 'build-arm64'));
    }
 
-   let dir = __dirname;
+   let dir = moduleDir;
    for (let i = 0; i < 6; i++) {
       for (const project of projects) {
          const candidate = path.join(dir, project, name);
@@ -148,7 +150,7 @@ function findInRepoBuild(name: string): string | null {
 
 // The native engines bundled with the published package: native/<platform>-<arch>/<name>.
 function findBundled(name: string): string | null {
-   const candidate = path.join(__dirname, '..', 'native', platformKey(), name);
+   const candidate = path.join(moduleDir, '..', 'native', platformKey(), name);
    return fs.existsSync(candidate) ? candidate : null;
 }
 
@@ -171,7 +173,7 @@ function resolveLibrary(explicit?: string): string {
    const fromRepo = findInRepoBuild(name);
    if (fromRepo) return fromRepo;
 
-   for (const dir of [process.cwd(), __dirname]) {
+   for (const dir of [process.cwd(), moduleDir]) {
       const candidate = path.join(dir, name);
       if (fs.existsSync(candidate)) return candidate;
    }

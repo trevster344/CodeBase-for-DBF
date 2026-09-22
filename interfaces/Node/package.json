@@ -1,14 +1,16 @@
 {
   "name": "@trevster344/codebase",
   "version": "0.5.0",
-  "description": "ESM FFI bindings (with TypeScript types) for the CodeBase native engine (c4dll.dll / c4dll64.dll)",
+  "description": "ESM + CommonJS FFI bindings (with TypeScript types) for the CodeBase native engine (c4dll.dll / c4dll64.dll)",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
@@ -34,7 +36,8 @@
     "foxpro",
     "ffi",
     "koffi",
-    "esm"
+    "esm",
+    "commonjs"
   ],
   "repository": {
     "type": "git",
@@ -49,7 +52,8 @@
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm run build:cjs",
+    "build:cjs": "node scripts/build-cjs.mjs",
     "bundle-native": "node scripts/bundle-native.mjs",
     "prepack": "npm run build && npm run bundle-native"
   },
@@ -58,9 +62,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.25.12",
     "typescript": "^5.6.0"
   },
   "allowScripts": {
-    "koffi@3.3.1": true
+    "koffi@3.3.1": true,
+    "esbuild@0.25.12": true
   }
 }
