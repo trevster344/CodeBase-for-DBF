@@ -81,7 +81,7 @@ typedef struct
 
 
 // AS Apr 18/05 - new callback functionality - currently only for windows 32 bit...
-#ifdef S4WIN32
+#if defined( S4WIN32 ) || defined( S4UNIX )
    typedef short (CALLBACK* QUERY_CALLBACK)(long) ;
    // AS Nov 2/05 - new callback functionality - to adjust the query prior to it actually being
    typedef const char * (CALLBACK* QUERY_SET_CALLBACK)(struct RELATE4St *, const char *) ;
@@ -136,7 +136,7 @@ typedef struct RELATE4St
    long preCountRecno ;
    int preCountBofFlag ;
    int preCountEofFlag ;
-   #ifdef S4WIN32
+   #if defined( S4WIN32 ) || defined( S4UNIX )
       // AS Apr 18/05 - new callback functionality - currently only for windows 32 bit...
       QUERY_CALLBACK callback ;
       QUERY_SET_CALLBACK querySetCallback ;

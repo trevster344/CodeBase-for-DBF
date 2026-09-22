@@ -4,13 +4,13 @@ Node.js (ESM) FFI bindings for the **CodeBase** native engine (`c4dll.dll` / `c4
 TypeScript types. It calls the exported C API in-process through [koffi](https://koffi.dev) — no
 server, no ODBC, no extra process.
 
-The package bundles **both** engines (`native/x64/c4dll64.dll` and `native/x86/c4dll.dll`) and
-picks the one matching `process.arch` at runtime.
+The package bundles the engines for **Windows (x64/ia32)** and **Linux (x64/arm64)** under
+`native/<platform>-<arch>/` and picks the one matching `process.platform` + `process.arch` at runtime.
 
 - Create, open, read and write DBF/CDX tables.
 - Full CODE4 lifecycle (`code4initVB` / `code4initUndo`) exposed as `Code4` + `dispose()`.
 - Typed: ships `dist/index.d.ts`.
-- ESM, Node ≥ 20, Windows.
+- ESM, Node ≥ 20, Windows and Linux.
 
 ---
 
@@ -25,7 +25,7 @@ picks the one matching `process.arch` at runtime.
 - [C API → JavaScript](#c-api--javascript)
 - [Recipes](#recipes)
 - [Library resolution](#library-resolution)
-- [Bitness](#bitness)
+- [Platform and bitness](#platform-and-bitness)
 - [Lifecycle and memory](#lifecycle-and-memory)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
@@ -38,11 +38,11 @@ picks the one matching `process.arch` at runtime.
 
 | | |
 |---|---|
-| OS | Windows (the engines are Windows DLLs) |
+| OS | **Windows** (x64/ia32) and **Linux** (x64/arm64) |
 | Node.js | **≥ 20** (ESM). `import` works from Node 16; CommonJS `require()` needs Node ≥ 22.12 |
-| Bitness | the Node process must match the engine — 64-bit Node ↔ `c4dll64.dll`, 32-bit Node ↔ `c4dll.dll` |
+| Bitness | the Node process must match the engine (a process can only load its own bitness) |
 
-The native engines are self-contained (only Windows system DLLs); there is nothing else to install.
+The native engines are self-contained; there is nothing else to install.
 
 ## Installation
 
@@ -68,7 +68,7 @@ npm install @trevster344/codebase
 ```bash
 npm install          # installs koffi + typescript
 npm run build        # tsc -> dist/index.js + dist/index.d.ts
-npm run bundle-native # copies the built engines into native/{x64,x86}
+npm run bundle-native # stages the built engines into native/<platform>-<arch>/
 ```
 
 ## Quick start
@@ -174,6 +174,7 @@ interface Code4Options {
    safety?: number;        // 0 = fastest
    errOff?: number;        // 1 = no error dialogs
    readOnly?: number;      // 1 = open files read-only
+   trim?: boolean;         // true = Field4.str()/memoStr() strip padding spaces (default false)
 }
 ```
 
@@ -184,6 +185,7 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | Member | Type | Description |
 |---|---|---|
 | `handle` | `bigint` | Opaque native `CODE4*` (rarely needed directly). |
+| `trim` | `boolean` | Whether `Field4.str()`/`memoStr()` trim padding spaces by default. |
 | `errorCode` | `number` | Current error code (`code4errorCode`). |
 | `errorText(code?)` | `string` | Description for `code` (or the current error). |
 | `open(name)` | `Data4` | Open an existing table; throws on failure. |
@@ -204,11 +206,27 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `appendStart(memo?)` | `number` | Begin appending (call once before `appendBlank`). |
 | `appendBlank()` | `number` | Append an empty record and move to it. |
 | `field(name)` | `Field4` | Get a field handle; throws if the field does not exist. |
-| `go(recNo)` | `number` | Move to a 1-based record number. |
+| `fieldAt(index)` | `Field4` | Field handle by 1-based position (`d4fieldJ`); throws when out of range. |
+| `fields()` | `FieldInfo[]` | Descriptors for every field, incl. null/auto flags (`d4fieldInfo`). |
+| `fieldNames()` | `string[]` | Field names in order. |
+| `go(recNo)` | `number` | Move to a 1-based record number (same as `goLow(recNo, 1)`). |
+| `goLow(recNo, goForWrite?)` | `number` | Move to a record with an explicit write flag (`d4goLow`, the engine's `d4go`); `goForWrite` defaults to `1`. |
+| `top()` | `number` | Move to the first record / top of the selected tag (`d4top`). |
+| `bottom()` | `number` | Move to the last record / bottom of the selected tag (`d4bottom`). |
+| `skip(n?)` | `number` | Move `n` records relative to the current position (`d4skip`); negative moves backwards. Defaults to `1`. |
+| `seekNext(key)` | `number` | Seek on the selected tag for the next matching key (`d4seekNext`); returns `r4eof` at the end. |
+| `recNo()` | `number` | 1-based current record number, or `<= 0` when unpositioned (`d4recNoLow`). |
+| `eof()` | `boolean` | Whether the pointer is past the last record (`d4eof`). |
+| `bof()` | `boolean` | Whether the pointer is before the first record (`d4bof`). |
 | `select(tagName)` | `void` | Select the active tag (`d4tag` + `d4tagSelect`); throws if missing. |
 | `seek(key)` | `number` | Seek on the selected tag; returns `r4success` (0) on a hit. |
 | `recCount()` | `number` | Number of records. |
 | `numFields()` | `number` | Number of fields. |
+| `flush()` | `number` | Flush pending writes (`d4flush`). |
+| `delete()` | `void` | Mark the current record deleted (`d4delete`); persist with `flush()`/`pack()`. |
+| `deleted()` | `boolean` | Whether the current record is marked deleted (`d4deleted`). |
+| `pack()` | `number` | Physically remove deleted records and rebuild tags (`d4pack`). |
+| `reindex()` | `number` | Rebuild all tags (`d4reindex`). |
 | `close()` | `number` | Close the file; idempotent. |
 
 ### `Field4`
@@ -218,12 +236,48 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `assign(value)` | `void` | Assign a string/number (`f4assignN`). |
 | `assignDouble(value)` | `void` | Assign a double (`f4assignDouble`). |
 | `assignInt(value)` | `void` | Assign an integer (`f4assignInt`) — use for `I` fields. |
-| `str()` | `string` | Read as string (`f4str`). |
+| `str(trim?)` | `string` | Read as string (`f4str`); trims padding spaces when trimming is enabled. `str(false)` returns the raw fixed-width value. |
 | `double()` | `number` | Read as double (`f4double`). |
 | `int()` | `number` | Read as integer (`f4int`). |
 | `memoAssign(value)` | `void` | Assign a memo (`f4memoAssignN`). |
-| `memoStr()` | `string` | Read a memo (`f4memoStr`). |
+| `memoStr(trim?)` | `string` | Read a memo (`f4memoStr`); trims padding spaces when trimming is enabled (per-call override supported). |
 | `memoLen()` | `number` | Memo length (`f4memoLen`). |
+| `name()` | `string` | Field name (`f4name`; long names supported). |
+| `number()` | `number` | 1-based field position (`f4number`). |
+| `type()` | `string` | One-character type code (`f4type`). |
+| `len()` | `number` | Field width (`f4len`). |
+| `decimals()` | `number` | Decimal count (`f4decimals`). |
+| `nullable()` | `boolean` | Whether the field allows nulls (`f4nullable`). |
+| `info()` | `FieldInfo` | Full descriptor incl. null/auto flags (same shape as `fields()`). |
+
+### `FieldInfo`
+
+Returned by `Data4.fields()` and `Field4.info()`.
+
+```ts
+interface FieldInfo {
+   number: number;          // 1-based position
+   name: string;
+   type: string;            // one-char code; binary char/memo appear as 'Z'/'X'
+   len: number;
+   dec: number;
+   nulls: number;           // raw code: 0 | r4null | r4autoIncrement | r4autoTimestamp
+   nullable: boolean;
+   autoIncrement: boolean;
+   autoTimestamp: boolean;
+}
+```
+
+```js
+for (const f of data.fields()) {
+   console.log(f.number, f.name, f.type, f.len, f.dec, f.nullable, f.autoIncrement);
+}
+```
+
+> **Trimming.** Character/numeric fields are fixed-width, so `f4str` returns the full field width
+> (char fields padded on the right, numeric fields right-justified with leading spaces). Pass
+> `trim: true` to `new Code4(...)` and `str()`/`memoStr()` strip the surrounding spaces, or override
+> per call with `str(false)` for the raw value. Trimming is **off by default**.
 
 ### `numCodeBaseInstances()`
 
@@ -239,6 +293,11 @@ Use it to assert you are not leaking instances.
 | Export | Type | Description |
 |---|---|---|
 | `r4success` | `0` | Success code returned by `seek`, `go`, … |
+| `r4found` / `r4after` | `1` / `2` | `seek` results: primary-key match / key found after seek. |
+| `r4eof` / `r4bof` | `3` / `4` | `skip`/`seekNext` results at the end / start of the file or tag. |
+| `r4null` | `190` | `FieldInfo.nulls` code: field allows nulls (FoxPro). |
+| `r4autoIncrement` | `195` | `FieldInfo.nulls` code: auto-increment field (FoxPro, `B` fields). |
+| `r4autoTimestamp` | `200` | `FieldInfo.nulls` code: auto-timestamp field (FoxPro, `T` fields). |
 | `r4type` | object | Field type codes (see [Field types](#field-types)). |
 | `libraryPath` | `string` | Absolute path of the engine that was loaded. |
 | `dllName` | `string` | File name selected for the current bitness. |
@@ -315,11 +374,25 @@ c4.create('C:/temp/TYPES', [
 | `f4assignInt` | `assignInt()` |
 | `f4str` / `f4double` / `f4int` | `str()` / `double()` / `int()` |
 | `f4memoAssignN` / `f4memoStr` / `f4memoLen` | `memoAssign()` / `memoStr()` / `memoLen()` |
-| `d4goLow` | `go()` |
+| `d4goLow` / `d4go` | `go()` / `goLow()` |
+| `d4top` / `d4bottom` | `top()` / `bottom()` |
+| `d4skip` | `skip()` |
 | `d4tag` + `d4tagSelect` | `select()` |
-| `d4seek` | `seek()` |
+| `d4seek` / `d4seekNext` | `seek()` / `seekNext()` |
+| `d4recNoLow` / `d4recNo` | `recNo()` |
+| `d4eof` / `d4bof` | `eof()` / `bof()` |
 | `d4recCountDo2` / `d4numFields` | `recCount()` / `numFields()` |
+| `d4flush` | `flush()` |
+| `d4delete` / `d4deleted` | `delete()` / `deleted()` |
+| `d4pack` / `d4reindex` | `pack()` / `reindex()` |
+| `d4fieldJ` | `fieldAt()` |
+| `d4fieldInfo` | `fields()` (freed via `u4freeDefault`) |
+| `f4name` / `f4number` / `f4type` / `f4len` / `f4decimals` / `f4nullable` | `name()` / `number()` / `type()` / `len()` / `decimals()` / `nullable()` |
 | `t4infoAdd` | used internally by `create()` for tags |
+
+> **Integer widths.** Engine parameters/returns declared as C `long` (record numbers, counts, memo
+> lengths, error codes) are bound to koffi's platform-aware `'long'`/`'ulong'`, so they are 4 bytes
+> on Windows (LLP64) and 8 bytes on Linux (LP64) — matching the native engine on both.
 
 ---
 
@@ -380,11 +453,46 @@ const note = data.field('NOTES').memoStr();
 console.log(data.field('NOTES').memoLen(), note);
 ```
 
+### List the fields
+
+`fields()` returns a descriptor for every field, including nullable / auto-increment / auto-timestamp
+flags; `fieldAt()` gives a `Field4` handle by 1-based position.
+
+```js
+const data = c4.open('C:/data/ORDERS');
+console.log(data.fieldNames());          // ['CUST', 'TOTAL', 'DATE']
+
+for (const f of data.fields()) {
+   console.log(f.number, f.name, f.type, f.len, f.dec, f.nullable, f.autoIncrement);
+}
+
+const total = data.fieldAt(2);           // Field4 for TOTAL
+console.log(total.name(), total.type(), total.len(), total.decimals());
+console.log(total.info());               // same shape as fields()[1]
+data.close();
+```
+
 ### Read-only access
 
 ```js
 const c4 = new Code4({ compatibility: 30, errOff: 1, readOnly: 1 });
 const data = c4.open('C:/data/ORDERS'); // opened read-only
+```
+
+### Trim padded field values
+
+Fixed-width character fields are padded on the right and numeric fields are right-justified (padded
+on the left). Enable `trim` on the `Code4` so `str()`/`memoStr()` return clean values, and use the
+per-call override for the raw width when you need it:
+
+```js
+const c4 = new Code4({ compatibility: 30, errOff: 1, trim: true });
+const data = c4.open('C:/data/ORDERS');
+
+data.go(1);
+console.log(data.field('CUST').str());        // 'ACME'   (not 'ACME      ')
+console.log(data.field('TOTAL').str());       // '1234.56'
+console.log(data.field('CUST').str(false));   // 'ACME      ' (raw, 10 chars)
 ```
 
 ### Server / web usage
@@ -468,11 +576,10 @@ Older Node should use `import` (or dynamic `await import('@trevster344/codebase'
 
 At import time the engine is located in this order:
 
-1. `CODE4_DLL` — absolute path to the DLL.
-2. `CODE4_DLL_DIR` — directory containing `c4dll.dll` / `c4dll64.dll`.
-3. The engine bundled with the package: `native/<x64|x86>/`.
-4. The repo build output (`build/MVStudio_2022_Project_VFP_STAND_ALONE_64|32`) when running from the
-   source tree.
+1. `CODE4_DLL` — absolute path to the native library.
+2. `CODE4_DLL_DIR` — directory containing the engine (`c4dll.dll` / `c4dll64.dll` / `libc4dll.so`).
+3. The engine bundled with the package: `native/<platform>-<arch>/` (e.g. `win32-x64`, `linux-arm64`).
+4. The repo build output when running from the source tree (Windows `build/…`, Linux `linux/build*`).
 5. The current working directory, then this module's directory.
 6. Otherwise the bare file name, letting the OS loader search `PATH`.
 
@@ -483,12 +590,19 @@ import { libraryPath } from '@trevster344/codebase';
 console.log(libraryPath);
 ```
 
-### Bitness
+### Platform and bitness
 
-A Windows process can only load a DLL of its **own** bitness. `process.arch` therefore selects the
-file: `x64` → `c4dll64.dll`, `ia32` → `c4dll.dll`. `CODE4_DLL` / `CODE4_DLL_DIR` override the
-*path*, not the architecture — a 64-bit Node cannot load the 32-bit engine, and vice versa. To use
-`c4dll.dll` you must run 32-bit Node.
+`process.platform` + `process.arch` select the engine:
+
+| Platform | Engine |
+|---|---|
+| `win32` + `x64` | `c4dll64.dll` |
+| `win32` + `ia32` | `c4dll.dll` |
+| `linux` + `x64` / `arm64` | `libc4dll.so` |
+
+A process can only load a library of its **own** bitness, so `CODE4_DLL` / `CODE4_DLL_DIR` override
+the *path*, not the architecture. Files are interchangeable across platforms — a DBF/CDX written on
+Windows reads on Linux and vice versa (and arm64 ↔ x64).
 
 ---
 
@@ -515,12 +629,13 @@ console.log(numCodeBaseInstances()); // 0
 ## Troubleshooting
 
 **`Error: Failed to load shared library: The specified module could not be found.`**
-The engine DLL was not found or is the wrong bitness. Check `libraryPath`/`dllName`, and make sure a
-64-bit Node loads `c4dll64.dll` and a 32-bit Node loads `c4dll.dll`. Point `CODE4_DLL` at the exact
-file if needed.
+The engine was not found or is the wrong bitness. Check `libraryPath`/`dllName`, and make sure the
+Node process matches the engine (`win32-x64` → `c4dll64.dll`, `linux-arm64` → `libc4dll.so`, …).
+Point `CODE4_DLL` at the exact file if needed.
 
-**`Unsupported Node architecture '...' (need x64 or ia32)`**
-Node is running on an unsupported architecture (e.g. ARM64). Use an x64 or ia32 Node.
+**`Unsupported platform/architecture '...'`**
+Node is running on a platform/arch the package does not ship an engine for. Supported:
+`win32-x64`, `win32-ia32`, `linux-x64`, `linux-arm64`.
 
 **`Cannot use import statement outside a module` / `require of ES Module`**
 The package is ESM. Use `import`, or Node ≥ 22.12 for `require()`.
@@ -529,10 +644,12 @@ The package is ESM. Use `import`, or Node ≥ 22.12 for `require()`.
 Approve it once: `npm install-scripts approve koffi`. koffi needs to place its prebuilt binding.
 
 **32-bit testing**
-Install a 32-bit Node and run it; the package will load `native/x86/c4dll.dll` automatically.
+Install a 32-bit Node and run it; the package will load `native/win32-ia32/c4dll.dll` automatically.
 
 **Field values look padded**
-Character/numeric fields are fixed-width; `.str()` returns the padded value — call `.trim()`.
+Character/numeric fields are fixed-width, so `.str()` returns the full field width. Pass
+`trim: true` to `new Code4(...)` to strip padding spaces automatically, or call `.str().trim()`
+yourself. `str(false)` always returns the raw value.
 
 ---
 
@@ -541,13 +658,14 @@ Character/numeric fields are fixed-width; `.str()` returns the padded value — 
 ```bash
 npm install
 npm run build         # tsc -> dist/ (index.js + index.d.ts)
-npm run bundle-native # copy the built engines into native/{x64,x86}
+npm run bundle-native # stage the built engines into native/<platform>-<arch>/
 npm pack --dry-run    # inspect the published tarball
 ```
 
 The TypeScript source is `index.ts`. Only `dist/` and `native/` are published (`files` in
-`package.json`). Tests live in `tests/Node` (a Vitest suite mirroring `test/CSharp/t4all.cs` plus a
-standalone console test).
+`package.json`). The native engines are built separately: Windows DLLs via the VS projects, Linux
+`libc4dll.so` via `linux/` (see `linux/README.md`). Tests live in `tests/Node` (a Vitest suite
+mirroring `test/CSharp/t4all.cs` plus a standalone console test).
 
 ## Publishing
 

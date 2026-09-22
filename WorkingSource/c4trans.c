@@ -1938,7 +1938,11 @@
                   // AS Mar 4/10 - log more info about what is going on in this case
                   CODE4 *c4 = trans->c4trans->c4 ;
                   char moreInfo[80] ;
-                  sprintf_s( moreInfo, "unable to lock record: %ld", recNo ) ;
+                  #ifdef S4WINDOWS_VS5_PLUS
+                     sprintf_s( moreInfo, "unable to lock record: %ld", recNo ) ;
+                  #else
+                     sprintf( moreInfo, "unable to lock record: %ld", recNo ) ;
+                  #endif
                   rc = error4describe( c4, e4lock, E83804, "failure to lock record to complete transaction rollback for data file:", d4alias( data ), moreInfo ) ;
                   int oldSafety = c4->safety ;
                   c4->safety = 0 ;

@@ -449,7 +449,7 @@ static unsigned file4longShiftValue( FILE4LONG nonshifted, short numShift )
 {
    // shifts such that we end up with a long value
    // AS Sep 30/04 - Compile fix
-   #ifdef S4FILE_EXTENDED
+   #ifdef S4FILE4LONG_STRUCT
       nonshifted.dLong = ( nonshifted.dLong << numShift ) ;
    #else
       nonshifted = ( nonshifted << numShift ) ;
@@ -465,7 +465,7 @@ static FILE4LONG file4longShiftValueLong( FILE4LONG nonshifted, short numShift )
 {
    // shifts such that we end up with a FILE4LONG value
    // AS Sep 30/04 - Compile fix
-   #ifdef S4FILE_EXTENDED
+   #ifdef S4FILE4LONG_STRUCT
       nonshifted.dLong = nonshifted.dLong << numShift ;
       // AS Sep 19/07 - dealing with dLong we need to leave longHi in place otherwise we adjust the shift value incorrectly
       // nonshifted.piece.longHi = 0 ;  // the shifting does not do the high byte, but it should be zeroed out
@@ -1205,7 +1205,7 @@ long opt4fileHash( OPT4 *opt, FILE4 *file, FILE4LONG pos )
    // return ( (( file->hashInit + pos ) >> opt->blockPower ) & opt->mask ) ;
    // AS Sep 30/04 - Compile fix
    file4longAdd( &pos, file->hashInit ) ;
-   #ifdef S4FILE_EXTENDED
+   #ifdef S4FILE4LONG_STRUCT
       pos.dLong = pos.dLong >> opt->blockPower ;
       pos.dLong = pos.dLong & opt->mask ;
    #else

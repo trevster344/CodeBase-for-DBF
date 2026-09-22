@@ -55,7 +55,7 @@ its `Declare` statements reference that name.)
 ## 4. Node.js / TypeScript
 
 The Node suite drives the engine through koffi FFI bindings (`interfaces/Node`), which load the
-native DLL at runtime. A process can only load a native DLL of its own bitness, so the x64 test
+native library at runtime. A process can only load a library of its own bitness, so the x64 test
 needs a 64-bit Node and the x86 test needs a 32-bit Node (the runner reports SKIP if it is missing).
 
 ```bash
@@ -75,9 +75,16 @@ reports SKIP for x86 when no 32-bit Node is installed.
 
 `tests/Node/t4all.test.ts` is a Vitest suite that mirrors `test/CSharp/t4all.cs` (CODE4 lifecycle
 plus a full CRUD round-trip over STR/NUM/LOG/DBL/MEM with STR/NUM tags and a tag seek);
-`tests/Node/test.ts` is the standalone console test. The published `interfaces/Node` package bundles
-both native engines under `native/{x64,x86}/` and selects one by `process.arch` (override with
-`CODE4_DLL` / `CODE4_DLL_DIR`).
+`tests/Node/test.ts` is the standalone console test.
+
+### Linux engine
+
+The same interface drives the **Linux** engine (`libc4dll.so`) — no separate binding is needed. The
+published package bundles Windows (x64/ia32) and Linux (x64/arm64) engines under
+`native/<platform>-<arch>/` and selects one by `process.platform` + `process.arch` (override with
+`CODE4_DLL` / `CODE4_DLL_DIR`). The Linux engine is built from `linux/` (see `linux/README.md`) and
+verified by `linux/smoke-test.mjs`. Files are interchangeable across platforms (Windows ↔ Linux,
+arm64 ↔ x64).
 
 ## Notes
 

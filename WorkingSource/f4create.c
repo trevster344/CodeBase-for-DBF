@@ -500,6 +500,9 @@ static int file4createLow( FILE4 *file, CODE4 *c4, const char *name )
          return r4noCreate ;
       }
    #endif
+   #ifdef S4DELAY_WRITE_MT
+      critical4sectionInit( &file->critical4file ) ;
+   #endif
    return 0 ;
 }
 #endif

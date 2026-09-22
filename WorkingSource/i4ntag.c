@@ -1569,7 +1569,9 @@ TAG4 *S4FUNCTION t4openLow( DATA4 *d4, INDEX4 *i4ndx, const char *fileName, cons
    // AS Oct 12/04 - We need to track the index access name associated with the TAG4FILE in case the indexfile gets opened again.
    // in particular in client/server to keep the index associated with the correct structure in case it is opened again by another client.
    if ( i4ndx )   // LY Oct 22/04 : avoid access violation if i4ndx == 0
-      strcpy( t4->tagFile->indexAccessName, i4ndx->accessName ) ;
+      /* indexAccessName is LEN4PATH while accessName is LEN4PATH+1, so copy bounds-checked. */
+      c4strncpy( t4->tagFile->indexAccessName, sizeof( t4->tagFile->indexAccessName ),
+                 i4ndx->accessName, sizeof( t4->tagFile->indexAccessName ) - 1 ) ;
 
    if ( t4->tagFile->header.unique )
       t4->errUnique = c4->errDefaultUnique ;

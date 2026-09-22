@@ -431,6 +431,21 @@
    #endif
 #endif
 
+#ifdef S4UNIX
+   /* Linux: threading is provided by the POSIX shim in posix4win.c. */
+   #ifndef S4SEMAPHORE
+      #define S4SEMAPHORE
+   #endif
+   #ifndef S4OFF_THREAD
+      #if !defined( S4OFF_WRITE_DELAY ) && !defined( S4WRITE_DELAY )
+         #define S4WRITE_DELAY
+      #endif
+      #if !defined( S4OFF_READ_ADVANCE ) && !defined( S4READ_ADVANCE )
+         #define S4READ_ADVANCE
+      #endif
+   #endif
+#endif
+
 #ifdef S4OFF_WRITE_DELAY
    #ifdef S4WRITE_DELAY
       #undef S4WRITE_DELAY
@@ -607,7 +622,9 @@
 #endif
 
 #ifdef S4UNIX
-   typedef int HANDLE ;
+   /* Linux/POSIX: HANDLE holds an opaque pointer-sized token (event/mutex/semaphore).  It is an
+      integer type so the existing INVALID4HANDLE (-1) comparisons keep working. */
+   typedef intptr_t HANDLE ;
    #define S4DIR   '/'
    #define S4DIRW L'/'
    #define S4DIR2   '/'
@@ -1270,7 +1287,7 @@
 #define TYPE4SCHEMA 'S'
 
 #ifdef S4DLL
-   #ifndef S4WINCE
+   #if defined( S4WIN32 ) && !defined( S4WINCE )
       #define sort4assignCmp(s4,f)  (s4)->cmp = (S4CMP_FUNCTION S4PTR *) MakeProcInstance((FARPROC) f, (HINSTANCE)(s4)->codeBase->hInst)
    #else
       #define sort4assignCmp(s4,f)  (s4)->cmp = (S4CMP_FUNCTION S4PTR *) (f)
@@ -2857,7 +2874,9 @@
    // AS Nov 12/04 - support for mdx encryption...now don't default to encryption for clipper
    // LY Mar 30/04 : added S4CLIPPER so code4encryptConnection is exported
    // AS Apr 24/06 -- don't support encryption in Clipper Stand/Alone (yet)
-   #if !defined( S4ENCRYPT_HOOK ) && (defined( S4CLIENT_OR_FOX ) || defined( S4MDX ) || (defined( S4CLIPPER ) && defined( S4CLIENT) ) )
+   // Linux: encryption is not supported (no encryption DLL / hook implementation), so do not
+   // auto-enable the encryption hook there.
+   #if !defined( S4ENCRYPT_HOOK ) && !defined( S4UNIX ) && (defined( S4CLIENT_OR_FOX ) || defined( S4MDX ) || (defined( S4CLIPPER ) && defined( S4CLIENT) ) )
       #define S4ENCRYPT_HOOK
    #endif
 //#endif

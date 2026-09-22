@@ -324,6 +324,10 @@
 static int file4lockLow( FILE4 *file, unsigned long posStart, long posStartHi, unsigned long numBytes, long numBytesHi )
 {
    int rc = 0 ;
+   #ifdef S4UNIX
+      // Linux locking path uses numAttempts to choose blocking vs non-blocking lockf/fcntl.
+      int numAttempts = file->codeBase->lockAttempts ;
+   #endif
 
    #ifdef S4MUTEX4LOCK
       // AS Nov 8/02 - sema4 locking is implemented as a counter.  Every lock done just increments the

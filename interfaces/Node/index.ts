@@ -22,6 +22,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** r4success error code. */
 export const r4success = 0;
 
+/** `seek`/`seekNext` return codes, mirroring interfaces/CSharp/Codebase.cs. */
+export const r4found = 1;
+export const r4after = 2;
+export const r4eof = 3;
+export const r4bof = 4;
+
+/** Field attribute codes reported in {@link FieldInfo.nulls} (FoxPro builds). */
+export const r4null = 190;
+export const r4autoIncrement = 195;
+export const r4autoTimestamp = 200;
+
 /** CodeBase field type codes (char), mirroring interfaces/CSharp/Codebase.cs. */
 export const r4type = {
    bin: 'B',
@@ -44,6 +55,8 @@ export interface Code4Options {
    safety?: number;
    errOff?: number;
    readOnly?: number;
+   /** When true, Field4.str()/memoStr() strip surrounding padding spaces. Default false. */
+   trim?: boolean;
 }
 
 /** A FIELD4INFO entry for {@link Code4.create}. `type` is a CodeBase type code (see {@link r4type}). */
@@ -64,29 +77,68 @@ export interface TagDef {
    descending?: number;
 }
 
-/* ------------------------------------------------------------- library resolve */
-
-function is64Bit(): boolean {
-   return process.arch === 'x64';
+/** A field descriptor returned by {@link Data4.fields}/{@link Field4.info}. */
+export interface FieldInfo {
+   /** 1-based field position. */
+   number: number;
+   name: string;
+   /** One-character type code (e.g. `'C'`, `'N'`, `'I'`); binary char/memo appear as `'Z'`/`'X'`. */
+   type: string;
+   len: number;
+   dec: number;
+   /** Raw attribute code: `0`, {@link r4null}, {@link r4autoIncrement} or {@link r4autoTimestamp}. */
+   nulls: number;
+   nullable: boolean;
+   autoIncrement: boolean;
+   autoTimestamp: boolean;
 }
 
+/* ------------------------------------------------------------- library resolve */
+
+/** `<platform>-<arch>` key for the bundled binary folder, e.g. `win32-x64`, `linux-arm64`. */
+function platformKey(): string {
+   return process.platform + '-' + process.arch;
+}
+
+/**
+ * File name of the native engine for the current platform/arch:
+ *   win32  -> c4dll64.dll (x64) / c4dll.dll (ia32)
+ *   linux  -> libc4dll.so  (x64 / arm64)
+ *   darwin -> libc4dll.dylib (x64 / arm64)   [not built yet]
+ */
 function resolveDllName(): string {
-   if (process.arch === 'x64') return 'c4dll64.dll';
-   if (process.arch === 'ia32') return 'c4dll.dll';
-   throw new Error("Unsupported Node architecture '" + process.arch + "' (need x64 or ia32)");
+   if (process.platform === 'win32') {
+      if (process.arch === 'x64') return 'c4dll64.dll';
+      if (process.arch === 'ia32') return 'c4dll.dll';
+   } else if (process.platform === 'linux') {
+      if (process.arch === 'x64' || process.arch === 'arm64') return 'libc4dll.so';
+   } else if (process.platform === 'darwin') {
+      if (process.arch === 'x64' || process.arch === 'arm64') return 'libc4dll.dylib';
+   }
+   throw new Error(
+      "Unsupported platform/architecture '" + process.platform + '/' + process.arch +
+      "' (supported: win32-x64, win32-ia32, linux-x64, linux-arm64)"
+   );
 }
 
 // Walk up from this module looking for the repo's native build output (works from both the
 // TypeScript source and the compiled dist/ layout).
 function findInRepoBuild(name: string): string | null {
-   const project = is64Bit()
-      ? path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
-      : path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32');
+   const projects: string[] = [];
+   if (process.platform === 'win32') {
+      projects.push(process.arch === 'x64'
+         ? path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
+         : path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32'));
+   } else if (process.platform === 'linux') {
+      projects.push(path.join('linux', 'build'), path.join('linux', 'build-arm64'));
+   }
 
    let dir = __dirname;
    for (let i = 0; i < 6; i++) {
-      const candidate = path.join(dir, project, name);
-      if (fs.existsSync(candidate)) return candidate;
+      for (const project of projects) {
+         const candidate = path.join(dir, project, name);
+         if (fs.existsSync(candidate)) return candidate;
+      }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
@@ -94,10 +146,9 @@ function findInRepoBuild(name: string): string | null {
    return null;
 }
 
-// The native engines bundled with the published package: native/<arch>/<dll>.
+// The native engines bundled with the published package: native/<platform>-<arch>/<name>.
 function findBundled(name: string): string | null {
-   const arch = is64Bit() ? 'x64' : 'x86';
-   const candidate = path.join(__dirname, '..', 'native', arch, name);
+   const candidate = path.join(__dirname, '..', 'native', platformKey(), name);
    return fs.existsSync(candidate) ? candidate : null;
 }
 
@@ -137,12 +188,23 @@ export const dllName = resolveDllName();
 
 const lib = koffi.load(libraryPath);
 
+/**
+ * Bind an engine function.  `__stdcall` applies to the Windows DLLs; koffi ignores it on x64 and
+ * rejects it on Linux, so only pass it on win32.
+ */
+function bind(name: string, result: any, params: any[]): any {
+   return process.platform === 'win32'
+      ? lib.func('__stdcall', name, result, params)
+      : lib.func(name, result, params);
+}
+
 /* --------------------------------------------------------------------- types */
 
 const CODE4 = koffi.pointer('CODE4', koffi.opaque());
 const DATA4 = koffi.pointer('DATA4', koffi.opaque());
 const FIELD4 = koffi.pointer('FIELD4', koffi.opaque());
 const TAG4 = koffi.pointer('TAG4', koffi.opaque());
+const VOIDP = koffi.pointer('void');
 
 // typedef struct { char *name; short type; unsigned short len, dec, nulls; } FIELD4INFO ;
 const FIELD4INFO = koffi.struct('FIELD4INFO', {
@@ -170,55 +232,82 @@ const TAG4INFOP = koffi.pointer(TAG4INFO);
 
 const native = {
    // lifecycle
-   code4initVB: lib.func('__stdcall', 'code4initVB', CODE4, []),
-   code4initUndo: lib.func('__stdcall', 'code4initUndo', 'int', [CODE4]),
+   code4initVB: bind('code4initVB', CODE4, []),
+   code4initUndo: bind('code4initUndo', 'int', [CODE4]),
 
    // options
-   code4compatibility: lib.func('__stdcall', 'code4compatibility', 'int16', [CODE4, 'int16']),
-   code4safety: lib.func('__stdcall', 'code4safety', 'int16', [CODE4, 'int16']),
-   code4errOff: lib.func('__stdcall', 'code4errOff', 'int16', [CODE4, 'int16']),
-   code4readOnly: lib.func('__stdcall', 'code4readOnly', 'int16', [CODE4, 'int16']),
+   code4compatibility: bind('code4compatibility', 'int16', [CODE4, 'int16']),
+   code4safety: bind('code4safety', 'int16', [CODE4, 'int16']),
+   code4errOff: bind('code4errOff', 'int16', [CODE4, 'int16']),
+   code4readOnly: bind('code4readOnly', 'int16', [CODE4, 'int16']),
 
    // errors
-   code4errorCode: lib.func('__stdcall', 'code4errorCode', 'int16', [CODE4, 'int16']),
-   error4text: lib.func('__stdcall', 'error4text', 'str', [CODE4, 'int32_t']),
+   code4errorCode: bind('code4errorCode', 'int16', [CODE4, 'int16']),
+   error4text: bind('error4text', 'str', [CODE4, 'long']),
 
    // data files
-   d4open: lib.func('__stdcall', 'd4open', DATA4, [CODE4, 'str']),
-   d4create: lib.func('__stdcall', 'd4create', DATA4, [CODE4, 'str', CODE4INFO, TAG4INFOP]),
+   d4open: bind('d4open', DATA4, [CODE4, 'str']),
+   d4create: bind('d4create', DATA4, [CODE4, 'str', CODE4INFO, TAG4INFOP]),
    // Build TAG4INFO arrays with the engine helper: the array and its strings are engine-allocated,
    // which avoids passing a raw struct array whose string fields the engine later walks.
-   t4infoAdd: lib.func('__stdcall', 't4infoAdd', TAG4INFOP, [CODE4, TAG4INFOP, 'int', 'str', 'str', 'str', 'int16', 'uint16']),
-   d4close: lib.func('__stdcall', 'd4close', 'int', [DATA4]),
-   d4appendStart: lib.func('__stdcall', 'd4appendStart', 'int16', [DATA4, 'int16']),
-   d4appendBlank: lib.func('__stdcall', 'd4appendBlank', 'int', [DATA4]),
-   d4field: lib.func('__stdcall', 'd4field', FIELD4, [DATA4, 'str']),
-   d4goLow: lib.func('__stdcall', 'd4goLow', 'int', [DATA4, 'int32_t', 'int16']),
-   d4seek: lib.func('__stdcall', 'd4seek', 'int', [DATA4, 'str']),
-   d4tag: lib.func('__stdcall', 'd4tag', TAG4, [DATA4, 'str']),
-   d4tagSelect: lib.func('__stdcall', 'd4tagSelect', 'void', [DATA4, TAG4]),
-   d4recCountDo2: lib.func('__stdcall', 'd4recCountDo2', 'int32_t', [DATA4, 'uint8']),
-   d4numFields: lib.func('__stdcall', 'd4numFields', 'int16', [DATA4]),
+   t4infoAdd: bind('t4infoAdd', TAG4INFOP, [CODE4, TAG4INFOP, 'int', 'str', 'str', 'str', 'int16', 'uint16']),
+   d4close: bind('d4close', 'int', [DATA4]),
+   d4appendStart: bind('d4appendStart', 'int16', [DATA4, 'int16']),
+   d4appendBlank: bind('d4appendBlank', 'int', [DATA4]),
+   d4field: bind('d4field', FIELD4, [DATA4, 'str']),
+   d4fieldJ: bind('d4fieldJ', FIELD4, [DATA4, 'int16']),
+   // d4fieldInfo returns an engine-allocated FIELD4INFO[] (numFields entries); the caller must free
+   // it with u4freeDefault after decoding.
+   d4fieldInfo: bind('d4fieldInfo', koffi.pointer(FIELD4INFO), [DATA4]),
+   u4freeDefault: bind('u4freeDefault', 'int', [VOIDP]),
+   // Record numbers and record counts are C `long`: 4 bytes on Windows (LLP64), 8 bytes on Linux
+   // (LP64). Koffi's platform-aware 'long' matches the engine on both, unlike a fixed 'int32_t'.
+   d4goLow: bind('d4goLow', 'int', [DATA4, 'long', 'int16']),
+   d4top: bind('d4top', 'int', [DATA4]),
+   d4bottom: bind('d4bottom', 'int', [DATA4]),
+   d4skip: bind('d4skip', 'int', [DATA4, 'long']),
+   d4seek: bind('d4seek', 'int', [DATA4, 'str']),
+   d4seekNext: bind('d4seekNext', 'int', [DATA4, 'str']),
+   d4recNoLow: bind('d4recNoLow', 'long', [DATA4]),
+   d4eof: bind('d4eof', 'int', [DATA4]),
+   d4bof: bind('d4bof', 'int', [DATA4]),
+   d4flush: bind('d4flush', 'int', [DATA4]),
+   d4delete: bind('d4delete', 'void', [DATA4]),
+   d4deleted: bind('d4deleted', 'int', [DATA4]),
+   d4pack: bind('d4pack', 'int', [DATA4]),
+   d4reindex: bind('d4reindex', 'int', [DATA4]),
+   d4tag: bind('d4tag', TAG4, [DATA4, 'str']),
+   d4tagSelect: bind('d4tagSelect', 'void', [DATA4, TAG4]),
+   d4recCountDo2: bind('d4recCountDo2', 'long', [DATA4, 'uint8']),
+   d4numFields: bind('d4numFields', 'int16', [DATA4]),
 
    // fields
-   f4assignN: lib.func('__stdcall', 'f4assignN', 'void', [FIELD4, 'str', 'uint']),
-   f4assignDouble: lib.func('__stdcall', 'f4assignDouble', 'void', [FIELD4, 'double']),
-   f4assignInt: lib.func('__stdcall', 'f4assignInt', 'void', [FIELD4, 'int']),
-   f4str: lib.func('__stdcall', 'f4str', 'str', [FIELD4]),
-   f4double: lib.func('__stdcall', 'f4double', 'double', [FIELD4]),
-   f4int: lib.func('__stdcall', 'f4int', 'int', [FIELD4]),
-   f4long: lib.func('__stdcall', 'f4long', 'int32_t', [FIELD4]),
+   f4assignN: bind('f4assignN', 'void', [FIELD4, 'str', 'uint']),
+   f4assignDouble: bind('f4assignDouble', 'void', [FIELD4, 'double']),
+   f4assignInt: bind('f4assignInt', 'void', [FIELD4, 'int']),
+   f4str: bind('f4str', 'str', [FIELD4]),
+   f4double: bind('f4double', 'double', [FIELD4]),
+   f4int: bind('f4int', 'int', [FIELD4]),
+   f4long: bind('f4long', 'long', [FIELD4]),
+
+   // field metadata (name/type/len/decimals and the nullable flag)
+   f4name: bind('f4name', 'str', [FIELD4]),
+   f4number: bind('f4number', 'int', [FIELD4]),
+   f4type: bind('f4type', 'int', [FIELD4]),
+   f4len: bind('f4len', 'ulong', [FIELD4]),
+   f4decimals: bind('f4decimals', 'int', [FIELD4]),
+   f4nullable: bind('f4nullable', 'int', [FIELD4]),
 
    // memo fields use their own assign/read entry points
-   f4memoAssignN: lib.func('__stdcall', 'f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
-   f4memoStr: lib.func('__stdcall', 'f4memoStr', 'str', [FIELD4]),
-   f4memoLen: lib.func('__stdcall', 'f4memoLen', 'uint32_t', [FIELD4])
+   f4memoAssignN: bind('f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
+   f4memoStr: bind('f4memoStr', 'str', [FIELD4]),
+   f4memoLen: bind('f4memoLen', 'ulong', [FIELD4])
 };
 
 // code4numCodeBaseCount() was added with the lifecycle fix; tolerate engines that lack it.
 let _numCodeBaseCount: ((...args: any[]) => any) | null = null;
 try {
-   _numCodeBaseCount = lib.func('__stdcall', 'code4numCodeBaseCount', 'uint', []);
+   _numCodeBaseCount = bind('code4numCodeBaseCount', 'uint', []);
 } catch {
    _numCodeBaseCount = null;
 }
@@ -235,6 +324,12 @@ export function numCodeBaseInstances(): number | null {
 
 function isNullPtr(p: any): boolean {
    return p == null || p === 0 || p === 0n;
+}
+
+// Fixed-width fields are padded with ASCII spaces (char fields on the right, numeric fields on the
+// left). Strip those padding spaces from both ends while leaving tabs/newlines in the data intact.
+function trimSpaces(s: string): string {
+   return s.replace(/ +$/, '').replace(/^ +/, '');
 }
 
 function typeCode(type: string | number): number {
@@ -259,13 +354,66 @@ function fieldInfoArray(fields: FieldDef[]): unknown[] {
 
 /** A field handle within an open data file. */
 export class Field4 {
+   private _data: Data4;
    private _field: bigint;
+   private _trim: boolean;
 
-   constructor(data: Data4, name: string) {
+   constructor(data: Data4, name: string, trim = false) {
+      this._data = data;
       this._field = native.d4field(data.handle, name);
+      this._trim = trim;
       if (isNullPtr(this._field)) {
          throw new Error("d4field('" + name + "') failed: " + data.errorText());
       }
+   }
+
+   /** Wrap an existing FIELD4 pointer (used by {@link Data4.fieldAt}). */
+   static fromHandle(data: Data4, handle: bigint, trim: boolean): Field4 {
+      const field: Field4 = Object.create(Field4.prototype);
+      field._data = data;
+      field._field = handle;
+      field._trim = trim;
+      return field;
+   }
+
+   /** Whether reads trim padding spaces by default (from {@link Code4Options.trim}). */
+   get trim(): boolean {
+      return this._trim;
+   }
+
+   /** Field name (via f4name; supports long field names). */
+   name(): string {
+      return native.f4name(this._field);
+   }
+
+   /** 1-based field position (via f4number). */
+   number(): number {
+      return native.f4number(this._field);
+   }
+
+   /** One-character field type code (via f4type). */
+   type(): string {
+      return String.fromCharCode(native.f4type(this._field));
+   }
+
+   /** Field width (via f4len). */
+   len(): number {
+      return native.f4len(this._field);
+   }
+
+   /** Decimal count (via f4decimals). */
+   decimals(): number {
+      return native.f4decimals(this._field);
+   }
+
+   /** Whether the field allows nulls (via f4nullable). */
+   nullable(): boolean {
+      return native.f4nullable(this._field) !== 0;
+   }
+
+   /** Full descriptor for this field, including null/auto flags (see {@link Data4.fields}). */
+   info(): FieldInfo {
+      return this._data.fields()[this.number() - 1];
    }
 
    /** Assign a string value (ANSI, via f4assignN). */
@@ -284,9 +432,14 @@ export class Field4 {
       native.f4assignInt(this._field, Number(value));
    }
 
-   /** Read the field as a string (via f4str). */
-   str(): string {
-      return native.f4str(this._field);
+   /**
+    * Read the field as a string (via f4str). Trailing/leading padding spaces are stripped when
+    * trimming is enabled (the Code4 `trim` option); pass `trim` to override for this call, e.g.
+    * `str(false)` for the raw fixed-width value.
+    */
+   str(trim?: boolean): string {
+      const s = native.f4str(this._field);
+      return (trim ?? this._trim) ? trimSpaces(s) : s;
    }
 
    /** Read the field as a double (via f4double). */
@@ -305,9 +458,13 @@ export class Field4 {
       native.f4memoAssignN(this._field, s, Buffer.byteLength(s));
    }
 
-   /** Read a memo value (via f4memoStr). */
-   memoStr(): string {
-      return native.f4memoStr(this._field);
+   /**
+    * Read a memo value (via f4memoStr). Surrounding padding spaces are stripped when trimming is
+    * enabled; pass `trim` to override for this call.
+    */
+   memoStr(trim?: boolean): string {
+      const s = native.f4memoStr(this._field);
+      return (trim ?? this._trim) ? trimSpaces(s) : s;
    }
 
    /** Length of the memo value (via f4memoLen). */
@@ -355,11 +512,101 @@ export class Data4 {
    }
 
    field(name: string): Field4 {
-      return new Field4(this, name);
+      return new Field4(this, name, this._code4.trim);
+   }
+
+   /** Field handle by 1-based position (d4fieldJ); throws when out of range. */
+   fieldAt(index: number): Field4 {
+      const count = this.numFields();
+      if (!Number.isInteger(index) || index < 1 || index > count) {
+         throw new Error('fieldAt(' + index + '): index out of range 1..' + count);
+      }
+      const handle = native.d4fieldJ(this._handle, index);
+      if (isNullPtr(handle)) {
+         throw new Error('d4fieldJ(' + index + ') failed: ' + this.errorText());
+      }
+      return Field4.fromHandle(this, handle, this._code4.trim);
+   }
+
+   /** Descriptors for every field, including null/auto flags (d4fieldInfo). */
+   fields(): FieldInfo[] {
+      const count = this.numFields();
+      if (count <= 0) return [];
+      const ptr = native.d4fieldInfo(this._handle);
+      if (isNullPtr(ptr)) {
+         throw new Error('d4fieldInfo failed: ' + this.errorText());
+      }
+      try {
+         const rows: any[] = koffi.decode(ptr, FIELD4INFO, count);
+         return rows.map((f, i) => ({
+            number: i + 1,
+            name: f.name,
+            type: String.fromCharCode(f.type),
+            len: f.len,
+            dec: f.dec,
+            nulls: f.nulls,
+            nullable: f.nulls === r4null,
+            autoIncrement: f.nulls === r4autoIncrement,
+            autoTimestamp: f.nulls === r4autoTimestamp
+         }));
+      } finally {
+         native.u4freeDefault(ptr);
+      }
+   }
+
+   /** Field names in order. */
+   fieldNames(): string[] {
+      return this.fields().map((f) => f.name);
    }
 
    go(recNo: number): number {
-      return native.d4goLow(this._handle, recNo, 1);
+      return this.goLow(recNo, 1);
+   }
+
+   /**
+    * Move to a 1-based record number with an explicit write flag (d4goLow, the engine's `d4go`
+    * macro). `goForWrite` defaults to 1 (position for update); pass 0 for read-only positioning.
+    */
+   goLow(recNo: number, goForWrite = 1): number {
+      return native.d4goLow(this._handle, recNo, goForWrite);
+   }
+
+   /** Move to the first record / top of the selected tag (d4top). */
+   top(): number {
+      return native.d4top(this._handle);
+   }
+
+   /** Move to the last record / bottom of the selected tag (d4bottom). */
+   bottom(): number {
+      return native.d4bottom(this._handle);
+   }
+
+   /**
+    * Move `n` records relative to the current position (d4skip); negative moves backwards. Returns
+    * `r4success`, or `r4eof`/`r4bof` when it moves past the ends of the file/tag.
+    */
+   skip(n = 1): number {
+      return native.d4skip(this._handle, n);
+   }
+
+   /** Seek on the selected tag for the next matching key (d4seekNext); returns `r4eof` at the end. */
+   seekNext(key: string): number {
+      return native.d4seekNext(this._handle, key);
+   }
+
+   /** 1-based record number of the current record, or <= 0 when no record is positioned (d4recNoLow). */
+   recNo(): number {
+      return native.d4recNoLow(this._handle);
+   }
+
+   /** True when the record pointer is past the last record (d4eof). */
+   eof(): boolean {
+      return native.d4eof(this._handle) !== 0;
+   }
+
+   /** True when the record pointer is before the first record (d4bof). */
+   bof(): boolean {
+      return native.d4bof(this._handle) !== 0;
    }
 
    seek(key: string): number {
@@ -383,6 +630,31 @@ export class Data4 {
       return native.d4numFields(this._handle);
    }
 
+   /** Flush pending writes (d4flush). */
+   flush(): number {
+      return native.d4flush(this._handle);
+   }
+
+   /** Mark the current record deleted (d4delete); persist with {@link flush} or {@link pack}. */
+   delete(): void {
+      native.d4delete(this._handle);
+   }
+
+   /** True when the current record is marked deleted (d4deleted). */
+   deleted(): boolean {
+      return native.d4deleted(this._handle) !== 0;
+   }
+
+   /** Physically remove deleted records and rebuild the tags (d4pack). */
+   pack(): number {
+      return native.d4pack(this._handle);
+   }
+
+   /** Rebuild all tags for this data file (d4reindex). */
+   reindex(): number {
+      return native.d4reindex(this._handle);
+   }
+
    close(): number {
       if (this._closed) return r4success;
       this._closed = true;
@@ -398,11 +670,13 @@ export class Data4 {
 export class Code4 {
    private _handle: bigint | null;
    private _disposed: boolean;
+   private _trim: boolean;
 
    constructor(options?: Code4Options) {
       options = options || {};
       this._handle = native.code4initVB();
       this._disposed = false;
+      this._trim = options.trim ?? false;
       if (isNullPtr(this._handle)) {
          throw new Error('code4initVB failed');
       }
@@ -415,6 +689,11 @@ export class Code4 {
    /** Opaque native CODE4 pointer. */
    get handle(): bigint {
       return this._handle!;
+   }
+
+   /** Whether {@link Field4.str}/{@link Field4.memoStr} trim padding spaces by default. */
+   get trim(): boolean {
+      return this._trim;
    }
 
    /** Current error code (via code4errorCode). */
@@ -491,6 +770,13 @@ const api = {
    Data4,
    Field4,
    r4success,
+   r4found,
+   r4after,
+   r4eof,
+   r4bof,
+   r4null,
+   r4autoIncrement,
+   r4autoTimestamp,
    r4type,
    Field4info,
    Tag4info

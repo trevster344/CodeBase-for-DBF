@@ -11,7 +11,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { Code4, r4success, r4type, numCodeBaseInstances } from '../../interfaces/Node/dist/index.js';
+import {
+   Code4,
+   r4success,
+   r4eof,
+   r4bof,
+   r4null,
+   r4autoIncrement,
+   r4autoTimestamp,
+   r4type,
+   numCodeBaseInstances
+} from '../../interfaces/Node/dist/index.js';
 import type { FieldDef, TagDef } from '../../interfaces/Node/dist/index.js';
 
 const dir = path.join(os.tmpdir(), 'codebase_t4all');
@@ -150,6 +160,332 @@ describe('t4all CRUD', () => {
          c4.dispose();
       }
       deleteTable(table);
+   });
+});
+
+describe('record positioning', () => {
+   it('top/bottom/goLow position the record pointer', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 10; i++) {
+            data.appendBlank();
+            data.field('STR').assign('REC' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+
+         // ---- no tag selected: physical record order ----
+         expect(data.top()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC1');
+         expect(data.bottom()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC10');
+
+         // ---- explicit goLow with the write flag (the d4go macro) ----
+         expect(data.goLow(5, 1)).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC5');
+         expect(data.goLow(3, 0)).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC3');
+
+         // ---- with the STR tag selected: top/bottom follow the tag order (lexicographic,
+         // so 'REC10' sorts between 'REC1' and 'REC2', making 'REC9' the last key) ----
+         data.select('STR');
+         expect(data.top()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC1');
+         expect(data.bottom()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC9');
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
+describe('cursor + maintenance', () => {
+   it('skip/recNo/eof/bof track the record pointer', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 10; i++) {
+            data.appendBlank();
+            data.field('STR').assign('REC' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+
+         expect(data.top()).toBe(r4success);
+         expect(data.recNo()).toBe(1);
+         expect(data.eof()).toBe(false);
+         expect(data.bof()).toBe(false);
+
+         expect(data.skip(2)).toBe(r4success);
+         expect(data.recNo()).toBe(3);
+
+         // negative skip exercises the signed `long` parameter
+         expect(data.skip(-1)).toBe(r4success);
+         expect(data.recNo()).toBe(2);
+
+         expect(data.bottom()).toBe(r4success);
+         expect(data.recNo()).toBe(10);
+
+         expect(data.skip(5)).toBe(r4eof);
+         expect(data.eof()).toBe(true);
+
+         expect(data.top()).toBe(r4success);
+         expect(data.skip(-5)).toBe(r4bof);
+         expect(data.bof()).toBe(true);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('seekNext walks duplicate keys', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (const s of ['A', 'A', 'A', 'B', 'C']) {
+            data.appendBlank();
+            data.field('STR').assign(s);
+         }
+         data.close();
+
+         data = c4.open(table);
+         data.select('STR');
+
+         expect(data.seek('A')).toBe(r4success);
+         const firstA = data.recNo();
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         expect(data.seekNext('A')).toBe(r4success);
+         const secondA = data.recNo();
+         expect(secondA).not.toBe(firstA);
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         expect(data.seekNext('A')).toBe(r4success);
+         const thirdA = data.recNo();
+         expect(thirdA).not.toBe(secondA);
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         // no fourth 'A' remains
+         expect(data.seekNext('A')).not.toBe(r4success);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('delete/flush/pack/reindex maintain the table', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 5; i++) {
+            data.appendBlank();
+            data.field('STR').assign('R' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+         expect(data.recCount()).toBe(5);
+
+         expect(data.go(2)).toBe(r4success);
+         data.delete();
+         expect(data.deleted()).toBe(true);
+         expect(data.flush()).toBe(r4success);
+
+         expect(data.pack()).toBe(r4success);
+         expect(data.recCount()).toBe(4);
+
+         expect(data.reindex()).toBe(r4success);
+         data.select('STR');
+         expect(data.seek('R3')).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('R3');
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
+describe('trim option', () => {
+   it('trims field and memo padding when enabled', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, trim: true });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         data.appendBlank();
+         data.field('STR').assign('Alice');
+         data.field('NUM').assign('101');
+         data.field('MEM').memoAssign('note   ');
+         data.close();
+
+         data = c4.open(table);
+         data.go(1);
+         expect(data.field('STR').str()).toBe('Alice');
+         expect(data.field('NUM').str()).toBe('101');
+         expect(data.field('MEM').memoStr()).toBe('note');
+
+         // per-call override returns the raw fixed-width value
+         expect(data.field('STR').str(false)).toBe('Alice     ');
+         expect(data.field('STR').str(false).length).toBe(10);
+         expect(data.field('NUM').str(false).length).toBe(4);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('leaves values padded when trim is not enabled', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         data.appendBlank();
+         data.field('STR').assign('Alice');
+         data.close();
+
+         data = c4.open(table);
+         data.go(1);
+         expect(data.field('STR').str()).toBe('Alice     ');
+         expect(data.field('STR').str().length).toBe(10);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
+describe('field enumeration', () => {
+   const ftable = path.join(dir, 't4fields');
+
+   it('lists fields with number/name/type/len/dec', () => {
+      deleteTable(ftable);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         const data = c4.create(ftable, makeFields(), makeTags());
+         const fields = data.fields();
+
+         expect(fields.map((f) => f.number)).toEqual([1, 2, 3, 4, 5]);
+         expect(fields.map((f) => f.name)).toEqual(['STR', 'NUM', 'LOG', 'DBL', 'MEM']);
+         expect(fields.map((f) => f.type)).toEqual(['C', 'N', 'L', 'B', 'M']);
+         // a FoxPro memo field's stored width is the 4-byte block pointer, not the requested len
+         expect(fields.map((f) => f.len)).toEqual([10, 4, 1, 8, 4]);
+         expect(fields.map((f) => f.dec)).toEqual([0, 0, 0, 0, 0]);
+         expect(fields.every((f) => !f.nullable && !f.autoIncrement && !f.autoTimestamp)).toBe(true);
+         expect(data.fieldNames()).toEqual(['STR', 'NUM', 'LOG', 'DBL', 'MEM']);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(ftable);
+   });
+
+   it('exposes per-field accessors and info()', () => {
+      deleteTable(ftable);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         const data = c4.create(ftable, makeFields(), makeTags());
+
+         const log = data.fieldAt(3);
+         expect(log.name()).toBe('LOG');
+         expect(log.number()).toBe(3);
+         expect(log.type()).toBe('L');
+         expect(log.len()).toBe(1);
+         expect(log.decimals()).toBe(0);
+         expect(log.nullable()).toBe(false);
+         expect(log.info()).toEqual({
+            number: 3,
+            name: 'LOG',
+            type: 'L',
+            len: 1,
+            dec: 0,
+            nulls: 0,
+            nullable: false,
+            autoIncrement: false,
+            autoTimestamp: false
+         });
+
+         // out-of-range is rejected in JS without touching the engine...
+         expect(() => data.fieldAt(0)).toThrow();
+         expect(() => data.fieldAt(99)).toThrow();
+         // ...so enumeration still works afterwards
+         expect(data.fields()).toHaveLength(5);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(ftable);
+   });
+
+   it('reports nullable and auto flags', () => {
+      deleteTable(ftable);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         const data = c4.create(ftable, [
+            { name: 'STR', type: r4type.str, len: 10 },
+            { name: 'NULLF', type: r4type.str, len: 5, nulls: r4null },
+            { name: 'AUTOINC', type: r4type.double, len: 8, nulls: r4autoIncrement },
+            { name: 'AUTOTS', type: r4type.dateTime, len: 8, nulls: r4autoTimestamp }
+         ], null);
+
+         const byName: Record<string, any> = {};
+         for (const f of data.fields()) byName[f.name] = f;
+
+         expect(byName.NULLF.nullable).toBe(true);
+         expect(byName.NULLF.nulls).toBe(r4null);
+         expect(byName.AUTOINC.autoIncrement).toBe(true);
+         expect(byName.AUTOINC.nulls).toBe(r4autoIncrement);
+         expect(byName.AUTOTS.autoTimestamp).toBe(true);
+         expect(byName.AUTOTS.nulls).toBe(r4autoTimestamp);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(ftable);
+   });
+
+   it('does not leak on repeated fields() calls', () => {
+      deleteTable(ftable);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         const data = c4.create(ftable, makeFields(), makeTags());
+         const before = numCodeBaseInstances();
+         for (let i = 0; i < 200; i++) {
+            expect(data.fields()).toHaveLength(5);
+         }
+         expect(numCodeBaseInstances()).toBe(before);
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(ftable);
    });
 });
 

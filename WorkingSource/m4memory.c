@@ -1167,7 +1167,11 @@ void *S4FUNCTION u4allocDefault( long n )
    {
       // AS Sept 13/02 - add some additional error handling to catch this call earlier
       char outBuf[150] ;
-      sprintf_s( outBuf, "exceeded the size allocation capacity.  Attempted to allocate %ld.  attempt to convert to size_t for allocation produced: %ld", n, (long)s ) ;
+      #ifdef S4WINDOWS_VS5_PLUS
+         sprintf_s( outBuf, "exceeded the size allocation capacity.  Attempted to allocate %ld.  attempt to convert to size_t for allocation produced: %ld", n, (long)s ) ;
+      #else
+         sprintf( outBuf, "exceeded the size allocation capacity.  Attempted to allocate %ld.  attempt to convert to size_t for allocation produced: %ld", n, (long)s ) ;
+      #endif
       error4describe( 0, e4memory, E85901, outBuf, 0, 0 ) ;
       return 0 ;
    }
