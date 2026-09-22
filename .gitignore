@@ -1,2 +1,5 @@
 # npm registry auth token (contains a secret; never commit)
 .npmrc
+
+# editor settings (machine-specific)
+.vscode/
