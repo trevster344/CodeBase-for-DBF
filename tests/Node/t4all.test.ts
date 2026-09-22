@@ -153,6 +153,49 @@ describe('t4all CRUD', () => {
    });
 });
 
+describe('record positioning', () => {
+   it('top/bottom/goLow position the record pointer', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 10; i++) {
+            data.appendBlank();
+            data.field('STR').assign('REC' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+
+         // ---- no tag selected: physical record order ----
+         expect(data.top()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC1');
+         expect(data.bottom()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC10');
+
+         // ---- explicit goLow with the write flag (the d4go macro) ----
+         expect(data.goLow(5, 1)).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC5');
+         expect(data.goLow(3, 0)).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC3');
+
+         // ---- with the STR tag selected: top/bottom follow the tag order (lexicographic,
+         // so 'REC10' sorts between 'REC1' and 'REC2', making 'REC9' the last key) ----
+         data.select('STR');
+         expect(data.top()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC1');
+         expect(data.bottom()).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('REC9');
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
 describe('integer fields', () => {
    it('round-trips an I field with assignInt/int', () => {
       deleteTable(table);

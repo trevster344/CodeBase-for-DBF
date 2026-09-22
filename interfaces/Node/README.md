@@ -204,7 +204,10 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `appendStart(memo?)` | `number` | Begin appending (call once before `appendBlank`). |
 | `appendBlank()` | `number` | Append an empty record and move to it. |
 | `field(name)` | `Field4` | Get a field handle; throws if the field does not exist. |
-| `go(recNo)` | `number` | Move to a 1-based record number. |
+| `go(recNo)` | `number` | Move to a 1-based record number (same as `goLow(recNo, 1)`). |
+| `goLow(recNo, goForWrite?)` | `number` | Move to a record with an explicit write flag (`d4goLow`, the engine's `d4go`); `goForWrite` defaults to `1`. |
+| `top()` | `number` | Move to the first record / top of the selected tag (`d4top`). |
+| `bottom()` | `number` | Move to the last record / bottom of the selected tag (`d4bottom`). |
 | `select(tagName)` | `void` | Select the active tag (`d4tag` + `d4tagSelect`); throws if missing. |
 | `seek(key)` | `number` | Seek on the selected tag; returns `r4success` (0) on a hit. |
 | `recCount()` | `number` | Number of records. |
@@ -315,7 +318,8 @@ c4.create('C:/temp/TYPES', [
 | `f4assignInt` | `assignInt()` |
 | `f4str` / `f4double` / `f4int` | `str()` / `double()` / `int()` |
 | `f4memoAssignN` / `f4memoStr` / `f4memoLen` | `memoAssign()` / `memoStr()` / `memoLen()` |
-| `d4goLow` | `go()` |
+| `d4goLow` / `d4go` | `go()` / `goLow()` |
+| `d4top` / `d4bottom` | `top()` / `bottom()` |
 | `d4tag` + `d4tagSelect` | `select()` |
 | `d4seek` | `seek()` |
 | `d4recCountDo2` / `d4numFields` | `recCount()` / `numFields()` |

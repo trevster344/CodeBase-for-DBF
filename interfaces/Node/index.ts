@@ -226,6 +226,8 @@ const native = {
    d4appendBlank: bind('d4appendBlank', 'int', [DATA4]),
    d4field: bind('d4field', FIELD4, [DATA4, 'str']),
    d4goLow: bind('d4goLow', 'int', [DATA4, 'int32_t', 'int16']),
+   d4top: bind('d4top', 'int', [DATA4]),
+   d4bottom: bind('d4bottom', 'int', [DATA4]),
    d4seek: bind('d4seek', 'int', [DATA4, 'str']),
    d4tag: bind('d4tag', TAG4, [DATA4, 'str']),
    d4tagSelect: bind('d4tagSelect', 'void', [DATA4, TAG4]),
@@ -391,7 +393,25 @@ export class Data4 {
    }
 
    go(recNo: number): number {
-      return native.d4goLow(this._handle, recNo, 1);
+      return this.goLow(recNo, 1);
+   }
+
+   /**
+    * Move to a 1-based record number with an explicit write flag (d4goLow, the engine's `d4go`
+    * macro). `goForWrite` defaults to 1 (position for update); pass 0 for read-only positioning.
+    */
+   goLow(recNo: number, goForWrite = 1): number {
+      return native.d4goLow(this._handle, recNo, goForWrite);
+   }
+
+   /** Move to the first record / top of the selected tag (d4top). */
+   top(): number {
+      return native.d4top(this._handle);
+   }
+
+   /** Move to the last record / bottom of the selected tag (d4bottom). */
+   bottom(): number {
+      return native.d4bottom(this._handle);
    }
 
    seek(key: string): number {
