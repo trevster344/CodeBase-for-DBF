@@ -6,6 +6,12 @@
    #else
       #pragma pack(1)
    #endif
+#elif defined(__GNUC__) || defined(__clang__)
+   /* Linux/POSIX: match the MSVC 32/64-bit build, which uses one-byte packing.
+      (arm64 faults on unaligned atomics/ldp-stp, so skip packing there.) */
+   #if !defined(__aarch64__)
+      #pragma pack(push,1)
+   #endif
 #else
    #ifdef __BORLANDC__
       #pragma pack(1)

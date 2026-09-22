@@ -1720,7 +1720,7 @@
                       #else
                         amountToWrite += createHeader.headerLen ;
                      #endif
-                     #ifdef S4FILE_EXTENDED  /* LY Dec 09/03 */
+                     #ifdef S4FILE4LONG_STRUCT  /* LY Dec 09/03 */
                         amountToWrite -= (long)seqWrite.pos.dLong ;
                      #else
                         amountToWrite -= (long)seqWrite.pos ;

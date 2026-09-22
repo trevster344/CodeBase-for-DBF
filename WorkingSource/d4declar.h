@@ -64,6 +64,9 @@
    // AS Dec 13/05 - under Windows strcat is becoming deprecated...
    #ifdef S4WINDOWS_VS5_PLUS
       #define c4strcat( a, aLen, b ) strcat_s( (a), (aLen), (b) )
+   #elif defined( S4UNIX )
+      /* Linux: bounds-checked (see posix4str.c).  The size argument is honoured, unlike strcat(). */
+      #define c4strcat( a, aLen, b ) c4strcat_s( (a), (aLen), (b) )
    #else
       #define c4strcat( a, aLen, b ) strcat( (a), (b) )
    #endif
@@ -76,6 +79,10 @@
    #ifdef S4WINDOWS_VS5_PLUS
       #define c4strcpy( a, aLen, b ) strcpy_s( (a), (aLen), (b) )
       #define c4strncat( a, aLen, b, c ) strncat_s( (a), aLen, (b), (c) )
+   #elif defined( S4UNIX )
+      /* Linux: bounds-checked (see posix4str.c). */
+      #define c4strcpy( a, aLen, b ) c4strcpy_s( (a), (aLen), (b) )
+      #define c4strncat( a, aLen, b, c ) c4strncat_s( (a), (aLen), (b), (c) )
    #else
       #define c4strcpy( a, aLen, b ) strcpy( (a), (b) )
       #define c4strncat( a, aLen, b, c ) strncat( (a), (b), (c) )
@@ -84,9 +91,21 @@
    #ifdef S4WINDOWS_VS5_PLUS
       #define c4strncpy( a, aLen, b, c ) strncpy_s( (a), aLen, (b), (c) )
       #define c4strnicmp _strnicmp
+   #elif defined( S4UNIX )
+      /* Linux: bounds-checked (see posix4str.c). */
+      #define c4strncpy( a, aLen, b, c ) c4strncpy_s( (a), (aLen), (b), (c) )
+      #define c4strnicmp strncasecmp
    #else
       #define c4strncpy( a, aLen, b, c ) strncpy( (a), (b), (c) )
       #define c4strnicmp strnicmp
+   #endif
+
+   #ifdef S4UNIX
+      /* Bounds-checked string helpers (Linux counterpart of the MSVC *_s CRT functions). */
+      size_t c4strcpy_s( char *dst, size_t dstSize, const char *src ) ;
+      size_t c4strcat_s( char *dst, size_t dstSize, const char *src ) ;
+      size_t c4strncat_s( char *dst, size_t dstSize, const char *src, size_t srcLen ) ;
+      size_t c4strncpy_s( char *dst, size_t dstSize, const char *src, size_t srcLen ) ;
    #endif
 
    #define c4toupper toupper
@@ -1349,7 +1368,11 @@ S4EXPORT long S4FUNCTION c4getTimeout( CODE4 S4PTR * ) ;
       S4EXPORT short S4FUNCTION code4fileFlush( CODE4 *cb, short value ) ;
       S4EXPORT short S4FUNCTION code4goError( CODE4 *cb, short value ) ;
       S4EXPORT short S4FUNCTION code4errGo( CODE4 *cb, short value ) ;
+   #ifdef S4WIN32
       S4EXPORT long long  S4FUNCTION code4hInst( CODE4 *cb, HINSTANCE value ) ;
+   #else
+      S4EXPORT long long  S4FUNCTION code4hInst( CODE4 *cb, long long value ) ;
+   #endif
       //The types of the above changed from long to HINSTANCE to support 64-bit programming.  March 17, 2026. JSH.
       S4EXPORT long long  S4FUNCTION code4hWnd( CODE4 *cb, HWND value ) ;
       // The types of the above changed from long to HWND to support 64-bit programming. March 17, 2026. JSH.
@@ -2963,7 +2986,7 @@ S4EXPORT int S4CALL u4keycmp( S4CMP_PARM, S4CMP_PARM, size_t, size_t, size_t, CO
 #endif
 
 // AS Sep 8/04 - changed for debugging support
-#ifdef S4WIN32
+#if defined( S4WIN32 ) || defined( S4UNIX )
    // AS Apr 11/05 - enabled general access to thse functions...
    void critical4sectionEnter( CRITICAL4SECTION * ) ;
    void critical4sectionLeave( CRITICAL4SECTION * ) ;
@@ -3197,8 +3220,8 @@ int u4createCopyrightFromStamp( char *, int ) ;
 
 
 // AS Aug 13/02 - Support for indicating porting issues for new features
-#ifdef S4WIN32
-   // As porting issues are addressed, the assert5port() calls themselves are removed
+// (no-op on all platforms; the assert5port() calls are removed as porting issues are addressed)
+#ifndef assert5port
    #define assert5port( val )
 #endif
 

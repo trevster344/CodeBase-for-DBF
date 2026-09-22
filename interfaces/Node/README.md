@@ -4,13 +4,13 @@ Node.js (ESM) FFI bindings for the **CodeBase** native engine (`c4dll.dll` / `c4
 TypeScript types. It calls the exported C API in-process through [koffi](https://koffi.dev) — no
 server, no ODBC, no extra process.
 
-The package bundles **both** engines (`native/x64/c4dll64.dll` and `native/x86/c4dll.dll`) and
-picks the one matching `process.arch` at runtime.
+The package bundles the engines for **Windows (x64/ia32)** and **Linux (x64/arm64)** under
+`native/<platform>-<arch>/` and picks the one matching `process.platform` + `process.arch` at runtime.
 
 - Create, open, read and write DBF/CDX tables.
 - Full CODE4 lifecycle (`code4initVB` / `code4initUndo`) exposed as `Code4` + `dispose()`.
 - Typed: ships `dist/index.d.ts`.
-- ESM, Node ≥ 20, Windows.
+- ESM, Node ≥ 20, Windows and Linux.
 
 ---
 
@@ -25,7 +25,7 @@ picks the one matching `process.arch` at runtime.
 - [C API → JavaScript](#c-api--javascript)
 - [Recipes](#recipes)
 - [Library resolution](#library-resolution)
-- [Bitness](#bitness)
+- [Platform and bitness](#platform-and-bitness)
 - [Lifecycle and memory](#lifecycle-and-memory)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
@@ -38,11 +38,11 @@ picks the one matching `process.arch` at runtime.
 
 | | |
 |---|---|
-| OS | Windows (the engines are Windows DLLs) |
+| OS | **Windows** (x64/ia32) and **Linux** (x64/arm64) |
 | Node.js | **≥ 20** (ESM). `import` works from Node 16; CommonJS `require()` needs Node ≥ 22.12 |
-| Bitness | the Node process must match the engine — 64-bit Node ↔ `c4dll64.dll`, 32-bit Node ↔ `c4dll.dll` |
+| Bitness | the Node process must match the engine (a process can only load its own bitness) |
 
-The native engines are self-contained (only Windows system DLLs); there is nothing else to install.
+The native engines are self-contained; there is nothing else to install.
 
 ## Installation
 
@@ -68,7 +68,7 @@ npm install @trevster344/codebase
 ```bash
 npm install          # installs koffi + typescript
 npm run build        # tsc -> dist/index.js + dist/index.d.ts
-npm run bundle-native # copies the built engines into native/{x64,x86}
+npm run bundle-native # stages the built engines into native/<platform>-<arch>/
 ```
 
 ## Quick start
@@ -468,11 +468,10 @@ Older Node should use `import` (or dynamic `await import('@trevster344/codebase'
 
 At import time the engine is located in this order:
 
-1. `CODE4_DLL` — absolute path to the DLL.
-2. `CODE4_DLL_DIR` — directory containing `c4dll.dll` / `c4dll64.dll`.
-3. The engine bundled with the package: `native/<x64|x86>/`.
-4. The repo build output (`build/MVStudio_2022_Project_VFP_STAND_ALONE_64|32`) when running from the
-   source tree.
+1. `CODE4_DLL` — absolute path to the native library.
+2. `CODE4_DLL_DIR` — directory containing the engine (`c4dll.dll` / `c4dll64.dll` / `libc4dll.so`).
+3. The engine bundled with the package: `native/<platform>-<arch>/` (e.g. `win32-x64`, `linux-arm64`).
+4. The repo build output when running from the source tree (Windows `build/…`, Linux `linux/build*`).
 5. The current working directory, then this module's directory.
 6. Otherwise the bare file name, letting the OS loader search `PATH`.
 
@@ -483,12 +482,19 @@ import { libraryPath } from '@trevster344/codebase';
 console.log(libraryPath);
 ```
 
-### Bitness
+### Platform and bitness
 
-A Windows process can only load a DLL of its **own** bitness. `process.arch` therefore selects the
-file: `x64` → `c4dll64.dll`, `ia32` → `c4dll.dll`. `CODE4_DLL` / `CODE4_DLL_DIR` override the
-*path*, not the architecture — a 64-bit Node cannot load the 32-bit engine, and vice versa. To use
-`c4dll.dll` you must run 32-bit Node.
+`process.platform` + `process.arch` select the engine:
+
+| Platform | Engine |
+|---|---|
+| `win32` + `x64` | `c4dll64.dll` |
+| `win32` + `ia32` | `c4dll.dll` |
+| `linux` + `x64` / `arm64` | `libc4dll.so` |
+
+A process can only load a library of its **own** bitness, so `CODE4_DLL` / `CODE4_DLL_DIR` override
+the *path*, not the architecture. Files are interchangeable across platforms — a DBF/CDX written on
+Windows reads on Linux and vice versa (and arm64 ↔ x64).
 
 ---
 
@@ -515,12 +521,13 @@ console.log(numCodeBaseInstances()); // 0
 ## Troubleshooting
 
 **`Error: Failed to load shared library: The specified module could not be found.`**
-The engine DLL was not found or is the wrong bitness. Check `libraryPath`/`dllName`, and make sure a
-64-bit Node loads `c4dll64.dll` and a 32-bit Node loads `c4dll.dll`. Point `CODE4_DLL` at the exact
-file if needed.
+The engine was not found or is the wrong bitness. Check `libraryPath`/`dllName`, and make sure the
+Node process matches the engine (`win32-x64` → `c4dll64.dll`, `linux-arm64` → `libc4dll.so`, …).
+Point `CODE4_DLL` at the exact file if needed.
 
-**`Unsupported Node architecture '...' (need x64 or ia32)`**
-Node is running on an unsupported architecture (e.g. ARM64). Use an x64 or ia32 Node.
+**`Unsupported platform/architecture '...'`**
+Node is running on a platform/arch the package does not ship an engine for. Supported:
+`win32-x64`, `win32-ia32`, `linux-x64`, `linux-arm64`.
 
 **`Cannot use import statement outside a module` / `require of ES Module`**
 The package is ESM. Use `import`, or Node ≥ 22.12 for `require()`.
@@ -529,7 +536,7 @@ The package is ESM. Use `import`, or Node ≥ 22.12 for `require()`.
 Approve it once: `npm install-scripts approve koffi`. koffi needs to place its prebuilt binding.
 
 **32-bit testing**
-Install a 32-bit Node and run it; the package will load `native/x86/c4dll.dll` automatically.
+Install a 32-bit Node and run it; the package will load `native/win32-ia32/c4dll.dll` automatically.
 
 **Field values look padded**
 Character/numeric fields are fixed-width; `.str()` returns the padded value — call `.trim()`.
@@ -541,13 +548,14 @@ Character/numeric fields are fixed-width; `.str()` returns the padded value — 
 ```bash
 npm install
 npm run build         # tsc -> dist/ (index.js + index.d.ts)
-npm run bundle-native # copy the built engines into native/{x64,x86}
+npm run bundle-native # stage the built engines into native/<platform>-<arch>/
 npm pack --dry-run    # inspect the published tarball
 ```
 
 The TypeScript source is `index.ts`. Only `dist/` and `native/` are published (`files` in
-`package.json`). Tests live in `tests/Node` (a Vitest suite mirroring `test/CSharp/t4all.cs` plus a
-standalone console test).
+`package.json`). The native engines are built separately: Windows DLLs via the VS projects, Linux
+`libc4dll.so` via `linux/` (see `linux/README.md`). Tests live in `tests/Node` (a Vitest suite
+mirroring `test/CSharp/t4all.cs` plus a standalone console test).
 
 ## Publishing
 

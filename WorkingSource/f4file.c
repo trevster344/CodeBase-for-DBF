@@ -76,6 +76,47 @@
          criticalSection->threadOwner = 0 ;
       LeaveCriticalSection( &(criticalSection->section) ) ;
    }
+#else
+   // Linux/POSIX implementations (CRITICAL4SECTION is pthread-based on non-Windows).
+   // Windows CRITICAL_SECTION is recursive; implement recursion in software so it works even for
+   // sections that are only zero-initialized (a zeroed pthread_mutex_t is a valid default mutex).
+   void critical4sectionInit( CRITICAL4SECTION *criticalSection )
+   {
+      memset( criticalSection, 0, sizeof(CRITICAL4SECTION) ) ;
+      pthread_mutex_init( &(criticalSection->section), 0 ) ;
+   }
+
+   void critical4sectionInitUndo( CRITICAL4SECTION *criticalSection )
+   {
+      pthread_mutex_destroy( &(criticalSection->section) ) ;
+      memset( criticalSection, 0, sizeof(CRITICAL4SECTION) ) ;
+   }
+
+   void critical4sectionEnter( CRITICAL4SECTION *criticalSection )
+   {
+      unsigned long self = (unsigned long) pthread_self() ;
+      if ( criticalSection->count != 0 && criticalSection->threadOwner == self )
+      {
+         criticalSection->count++ ;   /* recursive enter by the owning thread */
+         return ;
+      }
+      pthread_mutex_lock( &(criticalSection->section) ) ;
+      criticalSection->threadOwner = self ;
+      criticalSection->count = 1 ;
+   }
+
+   void critical4sectionLeave( CRITICAL4SECTION *criticalSection )
+   {
+      unsigned long self = (unsigned long) pthread_self() ;
+      if ( criticalSection->count == 0 || criticalSection->threadOwner != self )
+         return ;
+      criticalSection->count-- ;
+      if ( criticalSection->count == 0 )
+      {
+         criticalSection->threadOwner = 0 ;
+         pthread_mutex_unlock( &(criticalSection->section) ) ;
+      }
+   }
 #endif
 
 #ifdef S4NO_FILELENGTH

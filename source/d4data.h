@@ -514,6 +514,7 @@ typedef struct MEM4st
       #define file4longLess( f1, val ) ( (f1) < (val) )
       #define file4longLessEq( f1, val ) ( (f1) <= (val) )
       #define file4longMultiply( f1, f2 ) ( (f1) *= (f2) )
+      #define file4longMod( f1, f2 ) ( (f1) % (f2) )
       #define file4longSetLo( f1, val ) ( (f1) = (val) )
       #define file4longSubtract( f1, val ) ( *(f1) -= (val) )
       #define file4longSubtractLong( f1, f2 ) ( *(f1) -= *(f2) )
@@ -523,7 +524,7 @@ typedef struct MEM4st
       /* LY 2001/07/18 : added longLessLong and longEqualLong */
       #define file4longLessLong( f1, f2 ) ( (f1) < (f2) )
       #define file4longEqualLong( f1, f2 ) ( (f1) == (f2) )
-      #define file4longEqualZero( f1, f2 ) ( (f1) == 0 )
+      #define file4longEqualZero( f1 ) ( (f1) == 0 )
    #endif
 #else
    #define FILE4LONG unsigned long
@@ -562,6 +563,12 @@ typedef struct MEM4st
    #define file4longEqualZero( f1 ) ( (f1) == 0 )  // LY Jul 23/04
 #endif /* S4FILE_EXTENDED */
 
+/* Which representation of FILE4LONG is in use.  The struct form (with .dLong / .piece) is used when
+   S4FILE_EXTENDED is defined and the platform does not use the scalar off_t form (S464BIT, i.e.
+   64-bit UNIX).  Call sites that access .dLong should be guarded by S4FILE4LONG_STRUCT. */
+#if defined( S4FILE_EXTENDED ) && !defined( S464BIT )
+   #define S4FILE4LONG_STRUCT
+#endif
 
 
 /* structure whose size, when added to a FILE4LONG, will be 10 */
@@ -569,7 +576,6 @@ typedef struct FILE4LONG_EXTENDSt
 {
    char space[10 - sizeof( FILE4LONG )] ;
 } FILE4LONG_EXTEND ;
-
 
 // AS Sep 8/04 - changed for debugging support
 #ifdef S4WIN32
@@ -584,6 +590,15 @@ typedef struct FILE4LONG_EXTENDSt
    // #else
    //    #define CRITICAL4SECTION CRITICAL_SECTION
    // #endif
+#else
+   // Linux/POSIX: pthread-based critical section.  The operations are implemented in f4file.c.
+   #include <pthread.h>
+   typedef struct
+   {
+      pthread_mutex_t section ;
+      short count ;
+      unsigned long threadOwner ;
+   } CRITICAL4SECTION ;
 #endif
 
 
@@ -672,7 +687,7 @@ typedef struct FILE4LONG_EXTENDSt
 
       LIST4 optFiles ;
 
-      #ifdef S4WIN32
+      #if defined( S4WIN32 ) || defined( S4UNIX )
          #ifdef S4WRITE_DELAY
             LIST4 delayAvail ;   /* extra blocks to allow efficient delay-writing */
             char S4PTR *delayWriteBuffer ;
@@ -690,7 +705,7 @@ typedef struct FILE4LONG_EXTENDSt
          #endif
       #endif
 
-      #ifdef S4WIN32
+      #if defined( S4WIN32 ) || defined( S4UNIX )
          #ifdef S4ADVANCE_READ
             char S4PTR *advanceLargeBuffer ;
             CRITICAL4SECTION critical4optRead ;  // AS Sep 8/04 - changed for debugging support
@@ -1043,7 +1058,7 @@ typedef struct FILE4St
       FILE4LONG space44 ;  // LY May 21/04 : changed from long to match above definition (sizeof(FILE4LONG) can be > sizeof(long))
    #endif
 
-   #ifdef S4WIN32
+   #if defined( S4WIN32 ) || defined( S4UNIX )
       // AS Dec 11/02 - Renamed for clarification
       // all low-level reads and writes are protected through this critical section to ensure one thread is not reading the file
       // whilst another is writing to it.
@@ -2339,7 +2354,7 @@ typedef struct CODE4St
          int logOpen ;
       #endif
 
-      #ifdef S4WIN32
+      #if defined( S4WIN32 ) || defined( S4UNIX )
          #ifdef S4WRITE_DELAY
             int delayWritesEnabled ;
             Bool5 delayWritesDisabled ;  // AS Nov 21/05 - due to an apparent vb/xp sequencing problem, use this to indicate we were unable
@@ -2376,7 +2391,7 @@ typedef struct CODE4St
       #endif
       long largeFileOffset ;
 
-      #ifdef S4WIN32
+      #if defined( S4WIN32 ) || defined( S4UNIX )
          #ifdef S4READ_ADVANCE
             int advanceReadsEnabled ;
             Bool5 advanceReadsDisabled ;  // AS Nov 21/05 - due to an apparent vb/xp sequencing problem, use this to indicate we were unable

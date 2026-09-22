@@ -1,0 +1,106 @@
+name: Linux engine
+
+# Builds the CodeBase stand-alone engine for Linux (x64 and arm64) from the shared WorkingSource
+# tree via the linux/ CMake project, and runs the koffi smoke test.  Also rebuilds the Windows x64
+# DLL to catch regressions in the shared source.
+
+on:
+  push:
+    paths:
+      - 'WorkingSource/**'
+      - 'linux/**'
+      - '.github/workflows/linux-engine.yml'
+  pull_request:
+    paths:
+      - 'WorkingSource/**'
+      - 'linux/**'
+      - '.github/workflows/linux-engine.yml'
+  workflow_dispatch:
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++ make
+      - name: Build libc4dll.so (x64)
+        run: |
+          cmake -S linux -B linux/build -G "Unix Makefiles"
+          cmake --build linux/build -j
+      - name: Smoke test (x64)
+        run: |
+          mkdir -p /tmp/kt && cd /tmp/kt
+          npm init -y >/dev/null 2>&1
+          npm install koffi >/dev/null 2>&1
+          cp "$GITHUB_WORKSPACE/linux/smoke-test.mjs" .
+          node smoke-test.mjs "$GITHUB_WORKSPACE/linux/build/libc4dll.so"
+      - name: Interface test (x64)
+        run: |
+          npm --prefix interfaces/Node install --no-audit --no-fund
+          npm --prefix interfaces/Node run build
+          node linux/interface-test.mjs
+
+  linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross compiler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake make g++-aarch64-linux-gnu
+      - name: Cross-compile libc4dll.so (arm64)
+        run: |
+          cmake -S linux -B linux/build-arm64 -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/linux/toolchain/linux-arm64.cmake"
+          cmake --build linux/build-arm64 -j
+      - uses: docker/setup-qemu-action@v3
+      - name: Smoke + interface test (arm64 via QEMU)
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$GITHUB_WORKSPACE:/src" -w /tmp \
+            node:22-bookworm bash -c '
+              mkdir -p /tmp/kt && cd /tmp/kt
+              npm init -y >/dev/null 2>&1
+              npm install koffi >/dev/null 2>&1
+              cp /src/linux/smoke-test.mjs .
+              node smoke-test.mjs /src/linux/build-arm64/libc4dll.so
+              mkdir -p interfaces/Node linux/build-arm64
+              cp -r /src/interfaces/Node/dist interfaces/Node/
+              cp /src/linux/build-arm64/libc4dll.so linux/build-arm64/
+              cp /src/linux/interface-test.mjs linux/
+              node linux/interface-test.mjs'
+
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure source (stand-alone 64-bit)
+        shell: cmd
+        run: cd WorkingSource && SetVFP_CLIENT_SA64.BAT
+      - name: Build C4DLL64.dll
+        shell: cmd
+        run: msbuild build\MVStudio_2022_Project_VFP_STAND_ALONE_64\C4dll.vcxproj /p:Configuration=Release /p:Platform=x64 /m /v:minimal /nologo
+      - name: Configure source (stand-alone 32-bit)
+        shell: cmd
+        run: cd WorkingSource && SetVFP_CLIENT_SA32.BAT
+      - name: Build C4dll.dll
+        shell: cmd
+        run: msbuild build\MVStudio_2022_Project_VFP_STAND_ALONE_32\C4dll.vcxproj /p:Configuration=Release /p:Platform=Win32 /m /v:minimal /nologo
+      - name: Restore d4all.h
+        shell: bash
+        run: git checkout -- WorkingSource/d4all.h
+      - name: Build interface + bundle native engines
+        shell: bash
+        run: |
+          npm --prefix interfaces/Node install --no-audit --no-fund
+          npm --prefix interfaces/Node run build
+          npm --prefix interfaces/Node run bundle-native
+      - name: Node tests (typecheck + console + Vitest)
+        shell: bash
+        run: |
+          npm --prefix tests/Node install --no-audit --no-fund
+          npm --prefix tests/Node run typecheck
+          npm --prefix tests/Node test
+          npm --prefix tests/Node run test:unit
+      - name: C# / VB.NET tests (x64)
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1 -Platforms x64 -Frameworks net8.0

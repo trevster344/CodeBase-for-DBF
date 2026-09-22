@@ -66,27 +66,50 @@ export interface TagDef {
 
 /* ------------------------------------------------------------- library resolve */
 
-function is64Bit(): boolean {
-   return process.arch === 'x64';
+/** `<platform>-<arch>` key for the bundled binary folder, e.g. `win32-x64`, `linux-arm64`. */
+function platformKey(): string {
+   return process.platform + '-' + process.arch;
 }
 
+/**
+ * File name of the native engine for the current platform/arch:
+ *   win32  -> c4dll64.dll (x64) / c4dll.dll (ia32)
+ *   linux  -> libc4dll.so  (x64 / arm64)
+ *   darwin -> libc4dll.dylib (x64 / arm64)   [not built yet]
+ */
 function resolveDllName(): string {
-   if (process.arch === 'x64') return 'c4dll64.dll';
-   if (process.arch === 'ia32') return 'c4dll.dll';
-   throw new Error("Unsupported Node architecture '" + process.arch + "' (need x64 or ia32)");
+   if (process.platform === 'win32') {
+      if (process.arch === 'x64') return 'c4dll64.dll';
+      if (process.arch === 'ia32') return 'c4dll.dll';
+   } else if (process.platform === 'linux') {
+      if (process.arch === 'x64' || process.arch === 'arm64') return 'libc4dll.so';
+   } else if (process.platform === 'darwin') {
+      if (process.arch === 'x64' || process.arch === 'arm64') return 'libc4dll.dylib';
+   }
+   throw new Error(
+      "Unsupported platform/architecture '" + process.platform + '/' + process.arch +
+      "' (supported: win32-x64, win32-ia32, linux-x64, linux-arm64)"
+   );
 }
 
 // Walk up from this module looking for the repo's native build output (works from both the
 // TypeScript source and the compiled dist/ layout).
 function findInRepoBuild(name: string): string | null {
-   const project = is64Bit()
-      ? path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
-      : path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32');
+   const projects: string[] = [];
+   if (process.platform === 'win32') {
+      projects.push(process.arch === 'x64'
+         ? path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_64')
+         : path.join('build', 'MVStudio_2022_Project_VFP_STAND_ALONE_32'));
+   } else if (process.platform === 'linux') {
+      projects.push(path.join('linux', 'build'), path.join('linux', 'build-arm64'));
+   }
 
    let dir = __dirname;
    for (let i = 0; i < 6; i++) {
-      const candidate = path.join(dir, project, name);
-      if (fs.existsSync(candidate)) return candidate;
+      for (const project of projects) {
+         const candidate = path.join(dir, project, name);
+         if (fs.existsSync(candidate)) return candidate;
+      }
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;
@@ -94,10 +117,9 @@ function findInRepoBuild(name: string): string | null {
    return null;
 }
 
-// The native engines bundled with the published package: native/<arch>/<dll>.
+// The native engines bundled with the published package: native/<platform>-<arch>/<name>.
 function findBundled(name: string): string | null {
-   const arch = is64Bit() ? 'x64' : 'x86';
-   const candidate = path.join(__dirname, '..', 'native', arch, name);
+   const candidate = path.join(__dirname, '..', 'native', platformKey(), name);
    return fs.existsSync(candidate) ? candidate : null;
 }
 
@@ -137,6 +159,16 @@ export const dllName = resolveDllName();
 
 const lib = koffi.load(libraryPath);
 
+/**
+ * Bind an engine function.  `__stdcall` applies to the Windows DLLs; koffi ignores it on x64 and
+ * rejects it on Linux, so only pass it on win32.
+ */
+function bind(name: string, result: any, params: any[]): any {
+   return process.platform === 'win32'
+      ? lib.func('__stdcall', name, result, params)
+      : lib.func(name, result, params);
+}
+
 /* --------------------------------------------------------------------- types */
 
 const CODE4 = koffi.pointer('CODE4', koffi.opaque());
@@ -170,55 +202,55 @@ const TAG4INFOP = koffi.pointer(TAG4INFO);
 
 const native = {
    // lifecycle
-   code4initVB: lib.func('__stdcall', 'code4initVB', CODE4, []),
-   code4initUndo: lib.func('__stdcall', 'code4initUndo', 'int', [CODE4]),
+   code4initVB: bind('code4initVB', CODE4, []),
+   code4initUndo: bind('code4initUndo', 'int', [CODE4]),
 
    // options
-   code4compatibility: lib.func('__stdcall', 'code4compatibility', 'int16', [CODE4, 'int16']),
-   code4safety: lib.func('__stdcall', 'code4safety', 'int16', [CODE4, 'int16']),
-   code4errOff: lib.func('__stdcall', 'code4errOff', 'int16', [CODE4, 'int16']),
-   code4readOnly: lib.func('__stdcall', 'code4readOnly', 'int16', [CODE4, 'int16']),
+   code4compatibility: bind('code4compatibility', 'int16', [CODE4, 'int16']),
+   code4safety: bind('code4safety', 'int16', [CODE4, 'int16']),
+   code4errOff: bind('code4errOff', 'int16', [CODE4, 'int16']),
+   code4readOnly: bind('code4readOnly', 'int16', [CODE4, 'int16']),
 
    // errors
-   code4errorCode: lib.func('__stdcall', 'code4errorCode', 'int16', [CODE4, 'int16']),
-   error4text: lib.func('__stdcall', 'error4text', 'str', [CODE4, 'int32_t']),
+   code4errorCode: bind('code4errorCode', 'int16', [CODE4, 'int16']),
+   error4text: bind('error4text', 'str', [CODE4, 'int32_t']),
 
    // data files
-   d4open: lib.func('__stdcall', 'd4open', DATA4, [CODE4, 'str']),
-   d4create: lib.func('__stdcall', 'd4create', DATA4, [CODE4, 'str', CODE4INFO, TAG4INFOP]),
+   d4open: bind('d4open', DATA4, [CODE4, 'str']),
+   d4create: bind('d4create', DATA4, [CODE4, 'str', CODE4INFO, TAG4INFOP]),
    // Build TAG4INFO arrays with the engine helper: the array and its strings are engine-allocated,
    // which avoids passing a raw struct array whose string fields the engine later walks.
-   t4infoAdd: lib.func('__stdcall', 't4infoAdd', TAG4INFOP, [CODE4, TAG4INFOP, 'int', 'str', 'str', 'str', 'int16', 'uint16']),
-   d4close: lib.func('__stdcall', 'd4close', 'int', [DATA4]),
-   d4appendStart: lib.func('__stdcall', 'd4appendStart', 'int16', [DATA4, 'int16']),
-   d4appendBlank: lib.func('__stdcall', 'd4appendBlank', 'int', [DATA4]),
-   d4field: lib.func('__stdcall', 'd4field', FIELD4, [DATA4, 'str']),
-   d4goLow: lib.func('__stdcall', 'd4goLow', 'int', [DATA4, 'int32_t', 'int16']),
-   d4seek: lib.func('__stdcall', 'd4seek', 'int', [DATA4, 'str']),
-   d4tag: lib.func('__stdcall', 'd4tag', TAG4, [DATA4, 'str']),
-   d4tagSelect: lib.func('__stdcall', 'd4tagSelect', 'void', [DATA4, TAG4]),
-   d4recCountDo2: lib.func('__stdcall', 'd4recCountDo2', 'int32_t', [DATA4, 'uint8']),
-   d4numFields: lib.func('__stdcall', 'd4numFields', 'int16', [DATA4]),
+   t4infoAdd: bind('t4infoAdd', TAG4INFOP, [CODE4, TAG4INFOP, 'int', 'str', 'str', 'str', 'int16', 'uint16']),
+   d4close: bind('d4close', 'int', [DATA4]),
+   d4appendStart: bind('d4appendStart', 'int16', [DATA4, 'int16']),
+   d4appendBlank: bind('d4appendBlank', 'int', [DATA4]),
+   d4field: bind('d4field', FIELD4, [DATA4, 'str']),
+   d4goLow: bind('d4goLow', 'int', [DATA4, 'int32_t', 'int16']),
+   d4seek: bind('d4seek', 'int', [DATA4, 'str']),
+   d4tag: bind('d4tag', TAG4, [DATA4, 'str']),
+   d4tagSelect: bind('d4tagSelect', 'void', [DATA4, TAG4]),
+   d4recCountDo2: bind('d4recCountDo2', 'int32_t', [DATA4, 'uint8']),
+   d4numFields: bind('d4numFields', 'int16', [DATA4]),
 
    // fields
-   f4assignN: lib.func('__stdcall', 'f4assignN', 'void', [FIELD4, 'str', 'uint']),
-   f4assignDouble: lib.func('__stdcall', 'f4assignDouble', 'void', [FIELD4, 'double']),
-   f4assignInt: lib.func('__stdcall', 'f4assignInt', 'void', [FIELD4, 'int']),
-   f4str: lib.func('__stdcall', 'f4str', 'str', [FIELD4]),
-   f4double: lib.func('__stdcall', 'f4double', 'double', [FIELD4]),
-   f4int: lib.func('__stdcall', 'f4int', 'int', [FIELD4]),
-   f4long: lib.func('__stdcall', 'f4long', 'int32_t', [FIELD4]),
+   f4assignN: bind('f4assignN', 'void', [FIELD4, 'str', 'uint']),
+   f4assignDouble: bind('f4assignDouble', 'void', [FIELD4, 'double']),
+   f4assignInt: bind('f4assignInt', 'void', [FIELD4, 'int']),
+   f4str: bind('f4str', 'str', [FIELD4]),
+   f4double: bind('f4double', 'double', [FIELD4]),
+   f4int: bind('f4int', 'int', [FIELD4]),
+   f4long: bind('f4long', 'int32_t', [FIELD4]),
 
    // memo fields use their own assign/read entry points
-   f4memoAssignN: lib.func('__stdcall', 'f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
-   f4memoStr: lib.func('__stdcall', 'f4memoStr', 'str', [FIELD4]),
-   f4memoLen: lib.func('__stdcall', 'f4memoLen', 'uint32_t', [FIELD4])
+   f4memoAssignN: bind('f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
+   f4memoStr: bind('f4memoStr', 'str', [FIELD4]),
+   f4memoLen: bind('f4memoLen', 'uint32_t', [FIELD4])
 };
 
 // code4numCodeBaseCount() was added with the lifecycle fix; tolerate engines that lack it.
 let _numCodeBaseCount: ((...args: any[]) => any) | null = null;
 try {
-   _numCodeBaseCount = lib.func('__stdcall', 'code4numCodeBaseCount', 'uint', []);
+   _numCodeBaseCount = bind('code4numCodeBaseCount', 'uint', []);
 } catch {
    _numCodeBaseCount = null;
 }

@@ -232,7 +232,7 @@
 
 
 
-   static INDEX4 *i4createLow( DATA4 *, const char *, const TAG4INFO * ) ;
+   INDEX4 *i4createLow( DATA4 *, const char *, const TAG4INFO * ) ;
 
 
 
@@ -394,7 +394,7 @@
 
    #ifdef S4CLIENT
       // !S4OFF_INDEX, !S4OFF_WRITE, S4CLIENT
-      static INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
+      INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
       {
          CODE4 *c4 = d4->codeBase ;
          int tagIndex ;
@@ -1107,7 +1107,7 @@
 
 
          // !S4OFF_INDEX, !S4OFF_WRITE, !S4CLIENT, !S4CLIPPER
-         static INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
+         INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
          {
             char buf[258] ;
             i4formatFileName( d4, buf, sizeof( buf ), fileName ) ;
@@ -1450,7 +1450,7 @@
 
 
          // !S4OFF_INDEX, !S4OFF_WRITE, !S4CLIENT, S4CLIPPER
-         static INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
+         INDEX4 *i4createLow( DATA4 *d4, const char *fileName, const TAG4INFO *tagData )
          {
             #ifdef E4PARM_HIGH
                if ( fileName )

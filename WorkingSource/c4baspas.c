@@ -304,7 +304,12 @@
    }
 
    //long S4FUNCTION code4hInst( CODE4 *cb, long value )
-   long long S4FUNCTION code4hInst( CODE4 *cb, HINSTANCE value)
+   #ifdef S4WIN32
+      long long S4FUNCTION code4hInst( CODE4 *cb, HINSTANCE value )
+   #else
+      // Linux: hInst is not a pointer type, take a numeric value (same 8-byte width).
+      long long S4FUNCTION code4hInst( CODE4 *cb, long long value )
+   #endif
    // Corrected types for proper 64-bit operations. March 17, 2026. JSH.
    {
       #ifdef S4WIN32
