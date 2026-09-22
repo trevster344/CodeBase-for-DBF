@@ -174,6 +174,7 @@ interface Code4Options {
    safety?: number;        // 0 = fastest
    errOff?: number;        // 1 = no error dialogs
    readOnly?: number;      // 1 = open files read-only
+   trim?: boolean;         // true = Field4.str()/memoStr() strip padding spaces (default false)
 }
 ```
 
@@ -184,6 +185,7 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | Member | Type | Description |
 |---|---|---|
 | `handle` | `bigint` | Opaque native `CODE4*` (rarely needed directly). |
+| `trim` | `boolean` | Whether `Field4.str()`/`memoStr()` trim padding spaces by default. |
 | `errorCode` | `number` | Current error code (`code4errorCode`). |
 | `errorText(code?)` | `string` | Description for `code` (or the current error). |
 | `open(name)` | `Data4` | Open an existing table; throws on failure. |
@@ -231,12 +233,17 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `assign(value)` | `void` | Assign a string/number (`f4assignN`). |
 | `assignDouble(value)` | `void` | Assign a double (`f4assignDouble`). |
 | `assignInt(value)` | `void` | Assign an integer (`f4assignInt`) — use for `I` fields. |
-| `str()` | `string` | Read as string (`f4str`). |
+| `str(trim?)` | `string` | Read as string (`f4str`); trims padding spaces when trimming is enabled. `str(false)` returns the raw fixed-width value. |
 | `double()` | `number` | Read as double (`f4double`). |
 | `int()` | `number` | Read as integer (`f4int`). |
 | `memoAssign(value)` | `void` | Assign a memo (`f4memoAssignN`). |
-| `memoStr()` | `string` | Read a memo (`f4memoStr`). |
+| `memoStr(trim?)` | `string` | Read a memo (`f4memoStr`); trims padding spaces when trimming is enabled (per-call override supported). |
 | `memoLen()` | `number` | Memo length (`f4memoLen`). |
+
+> **Trimming.** Character/numeric fields are fixed-width, so `f4str` returns the full field width
+> (char fields padded on the right, numeric fields right-justified with leading spaces). Pass
+> `trim: true` to `new Code4(...)` and `str()`/`memoStr()` strip the surrounding spaces, or override
+> per call with `str(false)` for the raw value. Trimming is **off by default**.
 
 ### `numCodeBaseInstances()`
 
@@ -413,6 +420,22 @@ const c4 = new Code4({ compatibility: 30, errOff: 1, readOnly: 1 });
 const data = c4.open('C:/data/ORDERS'); // opened read-only
 ```
 
+### Trim padded field values
+
+Fixed-width character fields are padded on the right and numeric fields are right-justified (padded
+on the left). Enable `trim` on the `Code4` so `str()`/`memoStr()` return clean values, and use the
+per-call override for the raw width when you need it:
+
+```js
+const c4 = new Code4({ compatibility: 30, errOff: 1, trim: true });
+const data = c4.open('C:/data/ORDERS');
+
+data.go(1);
+console.log(data.field('CUST').str());        // 'ACME'   (not 'ACME      ')
+console.log(data.field('TOTAL').str());       // '1234.56'
+console.log(data.field('CUST').str(false));   // 'ACME      ' (raw, 10 chars)
+```
+
 ### Server / web usage
 
 Create one CODE4 per request and always release it, so handles and memory are reclaimed
@@ -565,7 +588,9 @@ Approve it once: `npm install-scripts approve koffi`. koffi needs to place its p
 Install a 32-bit Node and run it; the package will load `native/win32-ia32/c4dll.dll` automatically.
 
 **Field values look padded**
-Character/numeric fields are fixed-width; `.str()` returns the padded value — call `.trim()`.
+Character/numeric fields are fixed-width, so `.str()` returns the full field width. Pass
+`trim: true` to `new Code4(...)` to strip padding spaces automatically, or call `.str().trim()`
+yourself. `str(false)` always returns the raw value.
 
 ---
 

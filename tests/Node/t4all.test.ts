@@ -315,6 +315,60 @@ describe('cursor + maintenance', () => {
    });
 });
 
+describe('trim option', () => {
+   it('trims field and memo padding when enabled', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, trim: true });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         data.appendBlank();
+         data.field('STR').assign('Alice');
+         data.field('NUM').assign('101');
+         data.field('MEM').memoAssign('note   ');
+         data.close();
+
+         data = c4.open(table);
+         data.go(1);
+         expect(data.field('STR').str()).toBe('Alice');
+         expect(data.field('NUM').str()).toBe('101');
+         expect(data.field('MEM').memoStr()).toBe('note');
+
+         // per-call override returns the raw fixed-width value
+         expect(data.field('STR').str(false)).toBe('Alice     ');
+         expect(data.field('STR').str(false).length).toBe(10);
+         expect(data.field('NUM').str(false).length).toBe(4);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('leaves values padded when trim is not enabled', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         data.appendBlank();
+         data.field('STR').assign('Alice');
+         data.close();
+
+         data = c4.open(table);
+         data.go(1);
+         expect(data.field('STR').str()).toBe('Alice     ');
+         expect(data.field('STR').str().length).toBe(10);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
 describe('integer fields', () => {
    it('round-trips an I field with assignInt/int', () => {
       deleteTable(table);

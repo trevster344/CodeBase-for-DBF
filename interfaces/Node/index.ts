@@ -50,6 +50,8 @@ export interface Code4Options {
    safety?: number;
    errOff?: number;
    readOnly?: number;
+   /** When true, Field4.str()/memoStr() strip surrounding padding spaces. Default false. */
+   trim?: boolean;
 }
 
 /** A FIELD4INFO entry for {@link Code4.create}. `type` is a CodeBase type code (see {@link r4type}). */
@@ -289,6 +291,12 @@ function isNullPtr(p: any): boolean {
    return p == null || p === 0 || p === 0n;
 }
 
+// Fixed-width fields are padded with ASCII spaces (char fields on the right, numeric fields on the
+// left). Strip those padding spaces from both ends while leaving tabs/newlines in the data intact.
+function trimSpaces(s: string): string {
+   return s.replace(/ +$/, '').replace(/^ +/, '');
+}
+
 function typeCode(type: string | number): number {
    if (typeof type === 'number') return type;
    if (typeof type === 'string' && type.length > 0) return type.charCodeAt(0);
@@ -312,12 +320,19 @@ function fieldInfoArray(fields: FieldDef[]): unknown[] {
 /** A field handle within an open data file. */
 export class Field4 {
    private _field: bigint;
+   private _trim: boolean;
 
-   constructor(data: Data4, name: string) {
+   constructor(data: Data4, name: string, trim = false) {
       this._field = native.d4field(data.handle, name);
+      this._trim = trim;
       if (isNullPtr(this._field)) {
          throw new Error("d4field('" + name + "') failed: " + data.errorText());
       }
+   }
+
+   /** Whether reads trim padding spaces by default (from {@link Code4Options.trim}). */
+   get trim(): boolean {
+      return this._trim;
    }
 
    /** Assign a string value (ANSI, via f4assignN). */
@@ -336,9 +351,14 @@ export class Field4 {
       native.f4assignInt(this._field, Number(value));
    }
 
-   /** Read the field as a string (via f4str). */
-   str(): string {
-      return native.f4str(this._field);
+   /**
+    * Read the field as a string (via f4str). Trailing/leading padding spaces are stripped when
+    * trimming is enabled (the Code4 `trim` option); pass `trim` to override for this call, e.g.
+    * `str(false)` for the raw fixed-width value.
+    */
+   str(trim?: boolean): string {
+      const s = native.f4str(this._field);
+      return (trim ?? this._trim) ? trimSpaces(s) : s;
    }
 
    /** Read the field as a double (via f4double). */
@@ -357,9 +377,13 @@ export class Field4 {
       native.f4memoAssignN(this._field, s, Buffer.byteLength(s));
    }
 
-   /** Read a memo value (via f4memoStr). */
-   memoStr(): string {
-      return native.f4memoStr(this._field);
+   /**
+    * Read a memo value (via f4memoStr). Surrounding padding spaces are stripped when trimming is
+    * enabled; pass `trim` to override for this call.
+    */
+   memoStr(trim?: boolean): string {
+      const s = native.f4memoStr(this._field);
+      return (trim ?? this._trim) ? trimSpaces(s) : s;
    }
 
    /** Length of the memo value (via f4memoLen). */
@@ -407,7 +431,7 @@ export class Data4 {
    }
 
    field(name: string): Field4 {
-      return new Field4(this, name);
+      return new Field4(this, name, this._code4.trim);
    }
 
    go(recNo: number): number {
@@ -521,11 +545,13 @@ export class Data4 {
 export class Code4 {
    private _handle: bigint | null;
    private _disposed: boolean;
+   private _trim: boolean;
 
    constructor(options?: Code4Options) {
       options = options || {};
       this._handle = native.code4initVB();
       this._disposed = false;
+      this._trim = options.trim ?? false;
       if (isNullPtr(this._handle)) {
          throw new Error('code4initVB failed');
       }
@@ -538,6 +564,11 @@ export class Code4 {
    /** Opaque native CODE4 pointer. */
    get handle(): bigint {
       return this._handle!;
+   }
+
+   /** Whether {@link Field4.str}/{@link Field4.memoStr} trim padding spaces by default. */
+   get trim(): boolean {
+      return this._trim;
    }
 
    /** Current error code (via code4errorCode). */
