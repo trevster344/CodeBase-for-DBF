@@ -572,6 +572,11 @@ const { Code4, r4type } = require('@trevster344/codebase');
 `import` and `require()` expose the same named exports; a default export carrying the same members
 is provided for both (`const cb = require('@trevster344/codebase'); cb.default.Code4 === cb.Code4`).
 
+The `require` condition resolves to CommonJS type declarations (`dist/index.d.cts`), so a
+CommonJS/`node16` TypeScript project gets the CJS build and types without the
+`TS1479 (referenced file is an ECMAScript module)` error. An ESM project (`"type": "module"`) keeps
+resolving to `dist/index.d.ts`.
+
 ---
 
 ## Library resolution
@@ -660,7 +665,7 @@ yourself. `str(false)` always returns the raw value.
 
 ```bash
 npm install
-npm run build         # tsc -> dist/index.js + index.d.ts (ESM/types); esbuild -> dist/index.cjs (CJS)
+npm run build         # tsc -> dist/index.js + index.d.ts (ESM); esbuild -> dist/index.cjs + index.d.cts (CJS)
 npm run bundle-native # stage the built engines into native/<platform>-<arch>/
 npm pack --dry-run    # inspect the published tarball
 ```
