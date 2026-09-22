@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { Code4, r4success, r4type, numCodeBaseInstances } from '../../interfaces/Node/dist/index.js';
+import { Code4, r4success, r4eof, r4bof, r4type, numCodeBaseInstances } from '../../interfaces/Node/dist/index.js';
 import type { FieldDef, TagDef } from '../../interfaces/Node/dist/index.js';
 
 const dir = path.join(os.tmpdir(), 'codebase_t4all');
@@ -187,6 +187,125 @@ describe('record positioning', () => {
          expect(data.field('STR').str().trim()).toBe('REC1');
          expect(data.bottom()).toBe(r4success);
          expect(data.field('STR').str().trim()).toBe('REC9');
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+});
+
+describe('cursor + maintenance', () => {
+   it('skip/recNo/eof/bof track the record pointer', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 10; i++) {
+            data.appendBlank();
+            data.field('STR').assign('REC' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+
+         expect(data.top()).toBe(r4success);
+         expect(data.recNo()).toBe(1);
+         expect(data.eof()).toBe(false);
+         expect(data.bof()).toBe(false);
+
+         expect(data.skip(2)).toBe(r4success);
+         expect(data.recNo()).toBe(3);
+
+         // negative skip exercises the signed `long` parameter
+         expect(data.skip(-1)).toBe(r4success);
+         expect(data.recNo()).toBe(2);
+
+         expect(data.bottom()).toBe(r4success);
+         expect(data.recNo()).toBe(10);
+
+         expect(data.skip(5)).toBe(r4eof);
+         expect(data.eof()).toBe(true);
+
+         expect(data.top()).toBe(r4success);
+         expect(data.skip(-5)).toBe(r4bof);
+         expect(data.bof()).toBe(true);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('seekNext walks duplicate keys', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (const s of ['A', 'A', 'A', 'B', 'C']) {
+            data.appendBlank();
+            data.field('STR').assign(s);
+         }
+         data.close();
+
+         data = c4.open(table);
+         data.select('STR');
+
+         expect(data.seek('A')).toBe(r4success);
+         const firstA = data.recNo();
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         expect(data.seekNext('A')).toBe(r4success);
+         const secondA = data.recNo();
+         expect(secondA).not.toBe(firstA);
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         expect(data.seekNext('A')).toBe(r4success);
+         const thirdA = data.recNo();
+         expect(thirdA).not.toBe(secondA);
+         expect(data.field('STR').str().trim()).toBe('A');
+
+         // no fourth 'A' remains
+         expect(data.seekNext('A')).not.toBe(r4success);
+
+         data.close();
+      } finally {
+         c4.dispose();
+      }
+      deleteTable(table);
+   });
+
+   it('delete/flush/pack/reindex maintain the table', () => {
+      deleteTable(table);
+      const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1 });
+      try {
+         let data = c4.create(table, makeFields(), makeTags());
+         data.appendStart(0);
+         for (let i = 1; i <= 5; i++) {
+            data.appendBlank();
+            data.field('STR').assign('R' + i);
+         }
+         data.close();
+
+         data = c4.open(table);
+         expect(data.recCount()).toBe(5);
+
+         expect(data.go(2)).toBe(r4success);
+         data.delete();
+         expect(data.deleted()).toBe(true);
+         expect(data.flush()).toBe(r4success);
+
+         expect(data.pack()).toBe(r4success);
+         expect(data.recCount()).toBe(4);
+
+         expect(data.reindex()).toBe(r4success);
+         data.select('STR');
+         expect(data.seek('R3')).toBe(r4success);
+         expect(data.field('STR').str().trim()).toBe('R3');
 
          data.close();
       } finally {

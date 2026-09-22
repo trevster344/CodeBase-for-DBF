@@ -22,6 +22,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** r4success error code. */
 export const r4success = 0;
 
+/** `seek`/`seekNext` return codes, mirroring interfaces/CSharp/Codebase.cs. */
+export const r4found = 1;
+export const r4after = 2;
+export const r4eof = 3;
+export const r4bof = 4;
+
 /** CodeBase field type codes (char), mirroring interfaces/CSharp/Codebase.cs. */
 export const r4type = {
    bin: 'B',
@@ -213,7 +219,7 @@ const native = {
 
    // errors
    code4errorCode: bind('code4errorCode', 'int16', [CODE4, 'int16']),
-   error4text: bind('error4text', 'str', [CODE4, 'int32_t']),
+   error4text: bind('error4text', 'str', [CODE4, 'long']),
 
    // data files
    d4open: bind('d4open', DATA4, [CODE4, 'str']),
@@ -225,13 +231,25 @@ const native = {
    d4appendStart: bind('d4appendStart', 'int16', [DATA4, 'int16']),
    d4appendBlank: bind('d4appendBlank', 'int', [DATA4]),
    d4field: bind('d4field', FIELD4, [DATA4, 'str']),
-   d4goLow: bind('d4goLow', 'int', [DATA4, 'int32_t', 'int16']),
+   // Record numbers and record counts are C `long`: 4 bytes on Windows (LLP64), 8 bytes on Linux
+   // (LP64). Koffi's platform-aware 'long' matches the engine on both, unlike a fixed 'int32_t'.
+   d4goLow: bind('d4goLow', 'int', [DATA4, 'long', 'int16']),
    d4top: bind('d4top', 'int', [DATA4]),
    d4bottom: bind('d4bottom', 'int', [DATA4]),
+   d4skip: bind('d4skip', 'int', [DATA4, 'long']),
    d4seek: bind('d4seek', 'int', [DATA4, 'str']),
+   d4seekNext: bind('d4seekNext', 'int', [DATA4, 'str']),
+   d4recNoLow: bind('d4recNoLow', 'long', [DATA4]),
+   d4eof: bind('d4eof', 'int', [DATA4]),
+   d4bof: bind('d4bof', 'int', [DATA4]),
+   d4flush: bind('d4flush', 'int', [DATA4]),
+   d4delete: bind('d4delete', 'void', [DATA4]),
+   d4deleted: bind('d4deleted', 'int', [DATA4]),
+   d4pack: bind('d4pack', 'int', [DATA4]),
+   d4reindex: bind('d4reindex', 'int', [DATA4]),
    d4tag: bind('d4tag', TAG4, [DATA4, 'str']),
    d4tagSelect: bind('d4tagSelect', 'void', [DATA4, TAG4]),
-   d4recCountDo2: bind('d4recCountDo2', 'int32_t', [DATA4, 'uint8']),
+   d4recCountDo2: bind('d4recCountDo2', 'long', [DATA4, 'uint8']),
    d4numFields: bind('d4numFields', 'int16', [DATA4]),
 
    // fields
@@ -241,12 +259,12 @@ const native = {
    f4str: bind('f4str', 'str', [FIELD4]),
    f4double: bind('f4double', 'double', [FIELD4]),
    f4int: bind('f4int', 'int', [FIELD4]),
-   f4long: bind('f4long', 'int32_t', [FIELD4]),
+   f4long: bind('f4long', 'long', [FIELD4]),
 
    // memo fields use their own assign/read entry points
    f4memoAssignN: bind('f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
    f4memoStr: bind('f4memoStr', 'str', [FIELD4]),
-   f4memoLen: bind('f4memoLen', 'uint32_t', [FIELD4])
+   f4memoLen: bind('f4memoLen', 'ulong', [FIELD4])
 };
 
 // code4numCodeBaseCount() was added with the lifecycle fix; tolerate engines that lack it.
@@ -414,6 +432,34 @@ export class Data4 {
       return native.d4bottom(this._handle);
    }
 
+   /**
+    * Move `n` records relative to the current position (d4skip); negative moves backwards. Returns
+    * `r4success`, or `r4eof`/`r4bof` when it moves past the ends of the file/tag.
+    */
+   skip(n = 1): number {
+      return native.d4skip(this._handle, n);
+   }
+
+   /** Seek on the selected tag for the next matching key (d4seekNext); returns `r4eof` at the end. */
+   seekNext(key: string): number {
+      return native.d4seekNext(this._handle, key);
+   }
+
+   /** 1-based record number of the current record, or <= 0 when no record is positioned (d4recNoLow). */
+   recNo(): number {
+      return native.d4recNoLow(this._handle);
+   }
+
+   /** True when the record pointer is past the last record (d4eof). */
+   eof(): boolean {
+      return native.d4eof(this._handle) !== 0;
+   }
+
+   /** True when the record pointer is before the first record (d4bof). */
+   bof(): boolean {
+      return native.d4bof(this._handle) !== 0;
+   }
+
    seek(key: string): number {
       return native.d4seek(this._handle, key);
    }
@@ -433,6 +479,31 @@ export class Data4 {
 
    numFields(): number {
       return native.d4numFields(this._handle);
+   }
+
+   /** Flush pending writes (d4flush). */
+   flush(): number {
+      return native.d4flush(this._handle);
+   }
+
+   /** Mark the current record deleted (d4delete); persist with {@link flush} or {@link pack}. */
+   delete(): void {
+      native.d4delete(this._handle);
+   }
+
+   /** True when the current record is marked deleted (d4deleted). */
+   deleted(): boolean {
+      return native.d4deleted(this._handle) !== 0;
+   }
+
+   /** Physically remove deleted records and rebuild the tags (d4pack). */
+   pack(): number {
+      return native.d4pack(this._handle);
+   }
+
+   /** Rebuild all tags for this data file (d4reindex). */
+   reindex(): number {
+      return native.d4reindex(this._handle);
    }
 
    close(): number {
@@ -543,6 +614,10 @@ const api = {
    Data4,
    Field4,
    r4success,
+   r4found,
+   r4after,
+   r4eof,
+   r4bof,
    r4type,
    Field4info,
    Tag4info

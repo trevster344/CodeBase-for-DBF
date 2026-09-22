@@ -208,10 +208,20 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `goLow(recNo, goForWrite?)` | `number` | Move to a record with an explicit write flag (`d4goLow`, the engine's `d4go`); `goForWrite` defaults to `1`. |
 | `top()` | `number` | Move to the first record / top of the selected tag (`d4top`). |
 | `bottom()` | `number` | Move to the last record / bottom of the selected tag (`d4bottom`). |
+| `skip(n?)` | `number` | Move `n` records relative to the current position (`d4skip`); negative moves backwards. Defaults to `1`. |
+| `seekNext(key)` | `number` | Seek on the selected tag for the next matching key (`d4seekNext`); returns `r4eof` at the end. |
+| `recNo()` | `number` | 1-based current record number, or `<= 0` when unpositioned (`d4recNoLow`). |
+| `eof()` | `boolean` | Whether the pointer is past the last record (`d4eof`). |
+| `bof()` | `boolean` | Whether the pointer is before the first record (`d4bof`). |
 | `select(tagName)` | `void` | Select the active tag (`d4tag` + `d4tagSelect`); throws if missing. |
 | `seek(key)` | `number` | Seek on the selected tag; returns `r4success` (0) on a hit. |
 | `recCount()` | `number` | Number of records. |
 | `numFields()` | `number` | Number of fields. |
+| `flush()` | `number` | Flush pending writes (`d4flush`). |
+| `delete()` | `void` | Mark the current record deleted (`d4delete`); persist with `flush()`/`pack()`. |
+| `deleted()` | `boolean` | Whether the current record is marked deleted (`d4deleted`). |
+| `pack()` | `number` | Physically remove deleted records and rebuild tags (`d4pack`). |
+| `reindex()` | `number` | Rebuild all tags (`d4reindex`). |
 | `close()` | `number` | Close the file; idempotent. |
 
 ### `Field4`
@@ -242,6 +252,8 @@ Use it to assert you are not leaking instances.
 | Export | Type | Description |
 |---|---|---|
 | `r4success` | `0` | Success code returned by `seek`, `go`, … |
+| `r4found` / `r4after` | `1` / `2` | `seek` results: primary-key match / key found after seek. |
+| `r4eof` / `r4bof` | `3` / `4` | `skip`/`seekNext` results at the end / start of the file or tag. |
 | `r4type` | object | Field type codes (see [Field types](#field-types)). |
 | `libraryPath` | `string` | Absolute path of the engine that was loaded. |
 | `dllName` | `string` | File name selected for the current bitness. |
@@ -320,10 +332,20 @@ c4.create('C:/temp/TYPES', [
 | `f4memoAssignN` / `f4memoStr` / `f4memoLen` | `memoAssign()` / `memoStr()` / `memoLen()` |
 | `d4goLow` / `d4go` | `go()` / `goLow()` |
 | `d4top` / `d4bottom` | `top()` / `bottom()` |
+| `d4skip` | `skip()` |
 | `d4tag` + `d4tagSelect` | `select()` |
-| `d4seek` | `seek()` |
+| `d4seek` / `d4seekNext` | `seek()` / `seekNext()` |
+| `d4recNoLow` / `d4recNo` | `recNo()` |
+| `d4eof` / `d4bof` | `eof()` / `bof()` |
 | `d4recCountDo2` / `d4numFields` | `recCount()` / `numFields()` |
+| `d4flush` | `flush()` |
+| `d4delete` / `d4deleted` | `delete()` / `deleted()` |
+| `d4pack` / `d4reindex` | `pack()` / `reindex()` |
 | `t4infoAdd` | used internally by `create()` for tags |
+
+> **Integer widths.** Engine parameters/returns declared as C `long` (record numbers, counts, memo
+> lengths, error codes) are bound to koffi's platform-aware `'long'`/`'ulong'`, so they are 4 bytes
+> on Windows (LLP64) and 8 bytes on Linux (LP64) — matching the native engine on both.
 
 ---
 
