@@ -148,6 +148,69 @@ function testCrud(): number {
    }
 }
 
+function testEnumerate(): number {
+   const dir = path.join(os.tmpdir(), 'codebase_tests_node');
+   fs.mkdirSync(dir, { recursive: true });
+   const table = path.join(dir, 'ENUMTEST');
+   deleteTable(table);
+
+   let c4: cb.Code4 | null = null;
+   try {
+      c4 = new cb.Code4({ compatibility: 30, safety: 0, errOff: 1 });
+
+      const fields: cb.FieldDef[] = [
+         { name: 'STR', type: cb.r4type.str, len: 10 },
+         { name: 'NUM', type: cb.r4type.num, len: 4 },
+         { name: 'LOG', type: cb.r4type.log, len: 1 }
+      ];
+      const data = c4.create(table, fields, null);
+
+      const names = data.fieldNames();
+      if (names.join(',') !== 'STR,NUM,LOG') {
+         console.log('  enumerate : FAIL (fieldNames = ' + names.join(',') + ')');
+         data.close();
+         return 1;
+      }
+
+      const info = data.fields();
+      if (info.length !== 3 || info[1].name !== 'NUM' || info[1].type !== 'N' || info[1].len !== 4) {
+         console.log('  enumerate : FAIL (fields = ' + JSON.stringify(info) + ')');
+         data.close();
+         return 1;
+      }
+
+      const second = data.fieldAt(2);
+      if (second.name() !== 'NUM' || second.number() !== 2 || second.type() !== 'N' ||
+          second.len() !== 4 || second.decimals() !== 0 || second.nullable() !== false) {
+         console.log('  enumerate : FAIL (fieldAt(2) = ' + second.name() + '/' + second.type() + ')');
+         data.close();
+         return 1;
+      }
+
+      let threw = false;
+      try {
+         data.fieldAt(99);
+      } catch {
+         threw = true;
+      }
+      if (!threw) {
+         console.log('  enumerate : FAIL (fieldAt(99) did not throw)');
+         data.close();
+         return 1;
+      }
+
+      data.close();
+      console.log('  enumerate : fields()/fieldAt()/fieldNames() OK (STR/NUM/LOG)');
+      return 0;
+   } catch (ex) {
+      console.log('  enumerate : EXCEPTION ' + (ex as Error).message);
+      return 1;
+   } finally {
+      if (c4) c4.dispose();
+      deleteTable(table);
+   }
+}
+
 function checkLoadedModule(is64: boolean, rc: number): number {
    try {
       const report = (process as any).report ? (process as any).report.getReport() : null;
@@ -187,6 +250,7 @@ function main(): number {
    let rc = 0;
    rc |= testLifecycle();
    rc |= testCrud();
+   rc |= testEnumerate();
    rc = checkLoadedModule(is64, rc);
 
    console.log(rc === 0 ? 'PASS' : 'FAIL');

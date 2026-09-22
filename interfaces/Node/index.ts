@@ -28,6 +28,11 @@ export const r4after = 2;
 export const r4eof = 3;
 export const r4bof = 4;
 
+/** Field attribute codes reported in {@link FieldInfo.nulls} (FoxPro builds). */
+export const r4null = 190;
+export const r4autoIncrement = 195;
+export const r4autoTimestamp = 200;
+
 /** CodeBase field type codes (char), mirroring interfaces/CSharp/Codebase.cs. */
 export const r4type = {
    bin: 'B',
@@ -70,6 +75,22 @@ export interface TagDef {
    filter?: string;
    unique?: number;
    descending?: number;
+}
+
+/** A field descriptor returned by {@link Data4.fields}/{@link Field4.info}. */
+export interface FieldInfo {
+   /** 1-based field position. */
+   number: number;
+   name: string;
+   /** One-character type code (e.g. `'C'`, `'N'`, `'I'`); binary char/memo appear as `'Z'`/`'X'`. */
+   type: string;
+   len: number;
+   dec: number;
+   /** Raw attribute code: `0`, {@link r4null}, {@link r4autoIncrement} or {@link r4autoTimestamp}. */
+   nulls: number;
+   nullable: boolean;
+   autoIncrement: boolean;
+   autoTimestamp: boolean;
 }
 
 /* ------------------------------------------------------------- library resolve */
@@ -183,6 +204,7 @@ const CODE4 = koffi.pointer('CODE4', koffi.opaque());
 const DATA4 = koffi.pointer('DATA4', koffi.opaque());
 const FIELD4 = koffi.pointer('FIELD4', koffi.opaque());
 const TAG4 = koffi.pointer('TAG4', koffi.opaque());
+const VOIDP = koffi.pointer('void');
 
 // typedef struct { char *name; short type; unsigned short len, dec, nulls; } FIELD4INFO ;
 const FIELD4INFO = koffi.struct('FIELD4INFO', {
@@ -233,6 +255,11 @@ const native = {
    d4appendStart: bind('d4appendStart', 'int16', [DATA4, 'int16']),
    d4appendBlank: bind('d4appendBlank', 'int', [DATA4]),
    d4field: bind('d4field', FIELD4, [DATA4, 'str']),
+   d4fieldJ: bind('d4fieldJ', FIELD4, [DATA4, 'int16']),
+   // d4fieldInfo returns an engine-allocated FIELD4INFO[] (numFields entries); the caller must free
+   // it with u4freeDefault after decoding.
+   d4fieldInfo: bind('d4fieldInfo', koffi.pointer(FIELD4INFO), [DATA4]),
+   u4freeDefault: bind('u4freeDefault', 'int', [VOIDP]),
    // Record numbers and record counts are C `long`: 4 bytes on Windows (LLP64), 8 bytes on Linux
    // (LP64). Koffi's platform-aware 'long' matches the engine on both, unlike a fixed 'int32_t'.
    d4goLow: bind('d4goLow', 'int', [DATA4, 'long', 'int16']),
@@ -262,6 +289,14 @@ const native = {
    f4double: bind('f4double', 'double', [FIELD4]),
    f4int: bind('f4int', 'int', [FIELD4]),
    f4long: bind('f4long', 'long', [FIELD4]),
+
+   // field metadata (name/type/len/decimals and the nullable flag)
+   f4name: bind('f4name', 'str', [FIELD4]),
+   f4number: bind('f4number', 'int', [FIELD4]),
+   f4type: bind('f4type', 'int', [FIELD4]),
+   f4len: bind('f4len', 'ulong', [FIELD4]),
+   f4decimals: bind('f4decimals', 'int', [FIELD4]),
+   f4nullable: bind('f4nullable', 'int', [FIELD4]),
 
    // memo fields use their own assign/read entry points
    f4memoAssignN: bind('f4memoAssignN', 'int', [FIELD4, 'str', 'uint']),
@@ -319,10 +354,12 @@ function fieldInfoArray(fields: FieldDef[]): unknown[] {
 
 /** A field handle within an open data file. */
 export class Field4 {
+   private _data: Data4;
    private _field: bigint;
    private _trim: boolean;
 
    constructor(data: Data4, name: string, trim = false) {
+      this._data = data;
       this._field = native.d4field(data.handle, name);
       this._trim = trim;
       if (isNullPtr(this._field)) {
@@ -330,9 +367,53 @@ export class Field4 {
       }
    }
 
+   /** Wrap an existing FIELD4 pointer (used by {@link Data4.fieldAt}). */
+   static fromHandle(data: Data4, handle: bigint, trim: boolean): Field4 {
+      const field: Field4 = Object.create(Field4.prototype);
+      field._data = data;
+      field._field = handle;
+      field._trim = trim;
+      return field;
+   }
+
    /** Whether reads trim padding spaces by default (from {@link Code4Options.trim}). */
    get trim(): boolean {
       return this._trim;
+   }
+
+   /** Field name (via f4name; supports long field names). */
+   name(): string {
+      return native.f4name(this._field);
+   }
+
+   /** 1-based field position (via f4number). */
+   number(): number {
+      return native.f4number(this._field);
+   }
+
+   /** One-character field type code (via f4type). */
+   type(): string {
+      return String.fromCharCode(native.f4type(this._field));
+   }
+
+   /** Field width (via f4len). */
+   len(): number {
+      return native.f4len(this._field);
+   }
+
+   /** Decimal count (via f4decimals). */
+   decimals(): number {
+      return native.f4decimals(this._field);
+   }
+
+   /** Whether the field allows nulls (via f4nullable). */
+   nullable(): boolean {
+      return native.f4nullable(this._field) !== 0;
+   }
+
+   /** Full descriptor for this field, including null/auto flags (see {@link Data4.fields}). */
+   info(): FieldInfo {
+      return this._data.fields()[this.number() - 1];
    }
 
    /** Assign a string value (ANSI, via f4assignN). */
@@ -432,6 +513,50 @@ export class Data4 {
 
    field(name: string): Field4 {
       return new Field4(this, name, this._code4.trim);
+   }
+
+   /** Field handle by 1-based position (d4fieldJ); throws when out of range. */
+   fieldAt(index: number): Field4 {
+      const count = this.numFields();
+      if (!Number.isInteger(index) || index < 1 || index > count) {
+         throw new Error('fieldAt(' + index + '): index out of range 1..' + count);
+      }
+      const handle = native.d4fieldJ(this._handle, index);
+      if (isNullPtr(handle)) {
+         throw new Error('d4fieldJ(' + index + ') failed: ' + this.errorText());
+      }
+      return Field4.fromHandle(this, handle, this._code4.trim);
+   }
+
+   /** Descriptors for every field, including null/auto flags (d4fieldInfo). */
+   fields(): FieldInfo[] {
+      const count = this.numFields();
+      if (count <= 0) return [];
+      const ptr = native.d4fieldInfo(this._handle);
+      if (isNullPtr(ptr)) {
+         throw new Error('d4fieldInfo failed: ' + this.errorText());
+      }
+      try {
+         const rows: any[] = koffi.decode(ptr, FIELD4INFO, count);
+         return rows.map((f, i) => ({
+            number: i + 1,
+            name: f.name,
+            type: String.fromCharCode(f.type),
+            len: f.len,
+            dec: f.dec,
+            nulls: f.nulls,
+            nullable: f.nulls === r4null,
+            autoIncrement: f.nulls === r4autoIncrement,
+            autoTimestamp: f.nulls === r4autoTimestamp
+         }));
+      } finally {
+         native.u4freeDefault(ptr);
+      }
+   }
+
+   /** Field names in order. */
+   fieldNames(): string[] {
+      return this.fields().map((f) => f.name);
    }
 
    go(recNo: number): number {
@@ -649,6 +774,9 @@ const api = {
    r4after,
    r4eof,
    r4bof,
+   r4null,
+   r4autoIncrement,
+   r4autoTimestamp,
    r4type,
    Field4info,
    Tag4info

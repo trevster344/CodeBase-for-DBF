@@ -206,6 +206,9 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `appendStart(memo?)` | `number` | Begin appending (call once before `appendBlank`). |
 | `appendBlank()` | `number` | Append an empty record and move to it. |
 | `field(name)` | `Field4` | Get a field handle; throws if the field does not exist. |
+| `fieldAt(index)` | `Field4` | Field handle by 1-based position (`d4fieldJ`); throws when out of range. |
+| `fields()` | `FieldInfo[]` | Descriptors for every field, incl. null/auto flags (`d4fieldInfo`). |
+| `fieldNames()` | `string[]` | Field names in order. |
 | `go(recNo)` | `number` | Move to a 1-based record number (same as `goLow(recNo, 1)`). |
 | `goLow(recNo, goForWrite?)` | `number` | Move to a record with an explicit write flag (`d4goLow`, the engine's `d4go`); `goForWrite` defaults to `1`. |
 | `top()` | `number` | Move to the first record / top of the selected tag (`d4top`). |
@@ -239,6 +242,37 @@ const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
 | `memoAssign(value)` | `void` | Assign a memo (`f4memoAssignN`). |
 | `memoStr(trim?)` | `string` | Read a memo (`f4memoStr`); trims padding spaces when trimming is enabled (per-call override supported). |
 | `memoLen()` | `number` | Memo length (`f4memoLen`). |
+| `name()` | `string` | Field name (`f4name`; long names supported). |
+| `number()` | `number` | 1-based field position (`f4number`). |
+| `type()` | `string` | One-character type code (`f4type`). |
+| `len()` | `number` | Field width (`f4len`). |
+| `decimals()` | `number` | Decimal count (`f4decimals`). |
+| `nullable()` | `boolean` | Whether the field allows nulls (`f4nullable`). |
+| `info()` | `FieldInfo` | Full descriptor incl. null/auto flags (same shape as `fields()`). |
+
+### `FieldInfo`
+
+Returned by `Data4.fields()` and `Field4.info()`.
+
+```ts
+interface FieldInfo {
+   number: number;          // 1-based position
+   name: string;
+   type: string;            // one-char code; binary char/memo appear as 'Z'/'X'
+   len: number;
+   dec: number;
+   nulls: number;           // raw code: 0 | r4null | r4autoIncrement | r4autoTimestamp
+   nullable: boolean;
+   autoIncrement: boolean;
+   autoTimestamp: boolean;
+}
+```
+
+```js
+for (const f of data.fields()) {
+   console.log(f.number, f.name, f.type, f.len, f.dec, f.nullable, f.autoIncrement);
+}
+```
 
 > **Trimming.** Character/numeric fields are fixed-width, so `f4str` returns the full field width
 > (char fields padded on the right, numeric fields right-justified with leading spaces). Pass
@@ -261,6 +295,9 @@ Use it to assert you are not leaking instances.
 | `r4success` | `0` | Success code returned by `seek`, `go`, … |
 | `r4found` / `r4after` | `1` / `2` | `seek` results: primary-key match / key found after seek. |
 | `r4eof` / `r4bof` | `3` / `4` | `skip`/`seekNext` results at the end / start of the file or tag. |
+| `r4null` | `190` | `FieldInfo.nulls` code: field allows nulls (FoxPro). |
+| `r4autoIncrement` | `195` | `FieldInfo.nulls` code: auto-increment field (FoxPro, `B` fields). |
+| `r4autoTimestamp` | `200` | `FieldInfo.nulls` code: auto-timestamp field (FoxPro, `T` fields). |
 | `r4type` | object | Field type codes (see [Field types](#field-types)). |
 | `libraryPath` | `string` | Absolute path of the engine that was loaded. |
 | `dllName` | `string` | File name selected for the current bitness. |
@@ -348,6 +385,9 @@ c4.create('C:/temp/TYPES', [
 | `d4flush` | `flush()` |
 | `d4delete` / `d4deleted` | `delete()` / `deleted()` |
 | `d4pack` / `d4reindex` | `pack()` / `reindex()` |
+| `d4fieldJ` | `fieldAt()` |
+| `d4fieldInfo` | `fields()` (freed via `u4freeDefault`) |
+| `f4name` / `f4number` / `f4type` / `f4len` / `f4decimals` / `f4nullable` | `name()` / `number()` / `type()` / `len()` / `decimals()` / `nullable()` |
 | `t4infoAdd` | used internally by `create()` for tags |
 
 > **Integer widths.** Engine parameters/returns declared as C `long` (record numbers, counts, memo
@@ -411,6 +451,25 @@ if (data.seek('ACME') === r4success) {
 data.field('NOTES').memoAssign('A longer note...');
 const note = data.field('NOTES').memoStr();
 console.log(data.field('NOTES').memoLen(), note);
+```
+
+### List the fields
+
+`fields()` returns a descriptor for every field, including nullable / auto-increment / auto-timestamp
+flags; `fieldAt()` gives a `Field4` handle by 1-based position.
+
+```js
+const data = c4.open('C:/data/ORDERS');
+console.log(data.fieldNames());          // ['CUST', 'TOTAL', 'DATE']
+
+for (const f of data.fields()) {
+   console.log(f.number, f.name, f.type, f.len, f.dec, f.nullable, f.autoIncrement);
+}
+
+const total = data.fieldAt(2);           // Field4 for TOTAL
+console.log(total.name(), total.type(), total.len(), total.decimals());
+console.log(total.info());               // same shape as fields()[1]
+data.close();
 ```
 
 ### Read-only access
