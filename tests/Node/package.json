@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings test.ts",
     "test:x64": "node --experimental-strip-types --no-warnings test.ts",
+    "test:cjs": "node cjs.test.cjs",
     "test:unit": "vitest run"
   },
   "devDependencies": {
