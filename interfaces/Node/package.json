@@ -1,6 +1,6 @@
 {
   "name": "@trevster344/codebase",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "ESM + CommonJS FFI bindings (with TypeScript types) for the CodeBase native engine (c4dll.dll / c4dll64.dll)",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -42,6 +42,24 @@ function testExports() {
    return 0;
 }
 
+function testReimport() {
+   // jest (resetModules / isolateModules) re-evaluates this module per test file. koffi keeps a
+   // process-wide type registry, so a second evaluation re-registers CODE4/DATA4/... — this used to
+   // throw "Duplicate type name". Force a re-evaluation (drop the require cache, keep koffi shared)
+   // and assert it loads cleanly and still works.
+   const resolved = require.resolve('../../interfaces/Node/dist/index.cjs');
+   delete require.cache[resolved];
+   const again = require(resolved);
+   if (typeof again.Code4 !== 'function' || again.r4type.str !== 'C') {
+      console.log('  reimport  : FAIL (re-evaluated module is broken)');
+      return 1;
+   }
+   const c4 = new again.Code4({ errOff: 1 });
+   c4.dispose();
+   console.log('  reimport  : re-evaluation (koffi type registry) OK');
+   return 0;
+}
+
 function testLifecycle() {
    const before = cb.numCodeBaseInstances();
    const c4 = new cb.Code4({ errOff: 1 });
@@ -119,6 +137,7 @@ function main() {
 
    let rc = 0;
    rc |= testExports();
+   rc |= testReimport();
    rc |= testLifecycle();
    rc |= testCrud();
 
