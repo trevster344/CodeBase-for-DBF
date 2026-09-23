@@ -202,30 +202,44 @@ function bind(name: string, result: any, params: any[]): any {
 
 /* --------------------------------------------------------------------- types */
 
-const CODE4 = koffi.pointer('CODE4', koffi.opaque());
-const DATA4 = koffi.pointer('DATA4', koffi.opaque());
-const FIELD4 = koffi.pointer('FIELD4', koffi.opaque());
-const TAG4 = koffi.pointer('TAG4', koffi.opaque());
+// koffi keeps a single process-wide type registry. When a test runner (jest) re-evaluates this
+// module per test file (resetModules / isolateModules), the named types already exist, so a second
+// registration throws "Duplicate type name". Reuse the previously registered type in that case.
+function defineType<T>(name: string, register: () => T): T {
+   try {
+      return register();
+   } catch (err) {
+      if (err instanceof Error && /Duplicate type name/.test(err.message)) {
+         return koffi.type(name) as unknown as T;
+      }
+      throw err;
+   }
+}
+
+const CODE4 = defineType('CODE4', () => koffi.pointer('CODE4', koffi.opaque()));
+const DATA4 = defineType('DATA4', () => koffi.pointer('DATA4', koffi.opaque()));
+const FIELD4 = defineType('FIELD4', () => koffi.pointer('FIELD4', koffi.opaque()));
+const TAG4 = defineType('TAG4', () => koffi.pointer('TAG4', koffi.opaque()));
 const VOIDP = koffi.pointer('void');
 
 // typedef struct { char *name; short type; unsigned short len, dec, nulls; } FIELD4INFO ;
-const FIELD4INFO = koffi.struct('FIELD4INFO', {
+const FIELD4INFO = defineType('FIELD4INFO', () => koffi.struct('FIELD4INFO', {
    name: 'str',
    type: 'int16',
    len: 'uint16',
    dec: 'uint16',
    nulls: 'uint16'
-});
+}));
 
 // typedef struct { char *name; const char *expression; const char *filter;
 //                  short unique; unsigned short descending; } TAG4INFO ;
-const TAG4INFO = koffi.struct('TAG4INFO', {
+const TAG4INFO = defineType('TAG4INFO', () => koffi.struct('TAG4INFO', {
    name: 'str',
    expression: 'str',
    filter: 'str',
    unique: 'int16',
    descending: 'uint16'
-});
+}));
 
 /* ----------------------------------------------------------------- functions */
 
