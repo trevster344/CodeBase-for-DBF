@@ -205,11 +205,13 @@ function bind(name: string, result: any, params: any[]): any {
 // koffi keeps a single process-wide type registry. When a test runner (jest) re-evaluates this
 // module per test file (resetModules / isolateModules), the named types already exist, so a second
 // registration throws "Duplicate type name". Reuse the previously registered type in that case.
+// The error check is realm-agnostic: koffi's Error is created in the native addon's VM realm, so
+// `instanceof Error` is false under Jest; match on the message string instead.
 function defineType<T>(name: string, register: () => T): T {
    try {
       return register();
    } catch (err) {
-      if (err instanceof Error && /Duplicate type name/.test(err.message)) {
+      if (/Duplicate type name/.test(String((err as { message?: unknown })?.message ?? err))) {
          return koffi.type(name) as unknown as T;
       }
       throw err;
