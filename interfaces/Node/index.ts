@@ -24,6 +24,9 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 /** r4success error code. */
 export const r4success = 0;
 
+/** The engine's `r4check`: pass this to a setter/getter-style option function to read the value. */
+const r4check = -5;
+
 /** `seek`/`seekNext` return codes, mirroring interfaces/CSharp/Codebase.cs. */
 export const r4found = 1;
 export const r4after = 2;
@@ -59,6 +62,16 @@ export interface Code4Options {
    readOnly?: number;
    /** When true, Field4.str()/memoStr() strip surrounding padding spaces. Default false. */
    trim?: boolean;
+   /** Communications timeout in milliseconds (via code4timeoutSet). */
+   timeout?: number;
+   /** Lock attempts before giving up (via code4lockAttempts). `-1` waits forever. */
+   lockAttempts?: number;
+   /** Attempts for each lock in a group lock (via code4lockAttemptsSingle). */
+   lockAttemptsSingle?: number;
+   /** Delay in milliseconds between lock attempts (via code4lockDelay). */
+   lockDelay?: number;
+   /** When true, pre-locks are required for record modifications (via code4lockEnforce). */
+   lockEnforce?: boolean | number;
 }
 
 /** A FIELD4INFO entry for {@link Code4.create}. `type` is a CodeBase type code (see {@link r4type}). */
@@ -262,6 +275,15 @@ const native = {
    // errors
    code4errorCode: bind('code4errorCode', 'int16', [CODE4, 'int16']),
    error4text: bind('error4text', 'str', [CODE4, 'long']),
+
+   // timeout / locking knobs. code4lockAttempts and friends read the current value when passed
+   // -5 (the engine's r4check); code4timeout has a dedicated getter.
+   code4timeout: bind('code4timeout', 'long', [CODE4]),
+   code4timeoutSet: bind('code4timeoutSet', 'void', [CODE4, 'long']),
+   code4lockAttempts: bind('code4lockAttempts', 'int16', [CODE4, 'int16']),
+   code4lockAttemptsSingle: bind('code4lockAttemptsSingle', 'int16', [CODE4, 'int16']),
+   code4lockDelay: bind('code4lockDelay', 'long', [CODE4, 'long']),
+   code4lockEnforce: bind('code4lockEnforce', 'int16', [CODE4, 'int16']),
 
    // data files
    d4open: bind('d4open', DATA4, [CODE4, 'str']),
@@ -702,6 +724,11 @@ export class Code4 {
       if (options.safety !== undefined) native.code4safety(this._handle, options.safety);
       if (options.errOff !== undefined) native.code4errOff(this._handle, options.errOff);
       if (options.readOnly !== undefined) native.code4readOnly(this._handle, options.readOnly);
+      if (options.timeout !== undefined) this.timeout = options.timeout;
+      if (options.lockAttempts !== undefined) this.lockAttempts = options.lockAttempts;
+      if (options.lockAttemptsSingle !== undefined) this.lockAttemptsSingle = options.lockAttemptsSingle;
+      if (options.lockDelay !== undefined) this.lockDelay = options.lockDelay;
+      if (options.lockEnforce !== undefined) this.lockEnforce = options.lockEnforce;
    }
 
    /** Opaque native CODE4 pointer. */
@@ -714,9 +741,62 @@ export class Code4 {
       return this._trim;
    }
 
-   /** Current error code (via code4errorCode). */
+   /** Current error code (via code4errorCode). Set to `0` ({@link r4success}) to reset it. */
    get errorCode(): number {
-      return native.code4errorCode(this._handle, -5);
+      return native.code4errorCode(this._handle, r4check);
+   }
+
+   set errorCode(value: number) {
+      native.code4errorCode(this._handle, value);
+   }
+
+   /** Communications timeout in milliseconds (via code4timeout/code4timeoutSet). */
+   get timeout(): number {
+      return native.code4timeout(this._handle);
+   }
+
+   set timeout(value: number) {
+      native.code4timeoutSet(this._handle, value);
+   }
+
+   /** Lock attempts before giving up (via code4lockAttempts). `-1` waits forever. */
+   get lockAttempts(): number {
+      return native.code4lockAttempts(this._handle, r4check);
+   }
+
+   set lockAttempts(value: number) {
+      native.code4lockAttempts(this._handle, value);
+   }
+
+   /** Attempts for each lock in a group lock (via code4lockAttemptsSingle). */
+   get lockAttemptsSingle(): number {
+      return native.code4lockAttemptsSingle(this._handle, r4check);
+   }
+
+   set lockAttemptsSingle(value: number) {
+      native.code4lockAttemptsSingle(this._handle, value);
+   }
+
+   /** Delay in milliseconds between lock attempts (via code4lockDelay). */
+   get lockDelay(): number {
+      return native.code4lockDelay(this._handle, r4check);
+   }
+
+   set lockDelay(value: number) {
+      native.code4lockDelay(this._handle, value);
+   }
+
+   /**
+    * Whether pre-locks are required for record modifications (via code4lockEnforce). The engine
+    * reports this log flag as -1/0; the property normalizes it to a boolean. The setter accepts a
+    * boolean or any number (non-zero enables it).
+    */
+   get lockEnforce(): boolean {
+      return native.code4lockEnforce(this._handle, r4check) !== 0;
+   }
+
+   set lockEnforce(value: boolean | number) {
+      native.code4lockEnforce(this._handle, value ? 1 : 0);
    }
 
    /** Error description for `code` (or the current error). */

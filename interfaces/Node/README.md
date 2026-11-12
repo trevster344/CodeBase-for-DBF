@@ -170,23 +170,42 @@ Creates and initializes a CODE4. Throws if initialization fails.
 
 ```ts
 interface Code4Options {
-   compatibility?: number; // e.g. 30
-   safety?: number;        // 0 = fastest
-   errOff?: number;        // 1 = no error dialogs
-   readOnly?: number;      // 1 = open files read-only
-   trim?: boolean;         // true = Field4.str()/memoStr() strip padding spaces (default false)
+   compatibility?: number;   // e.g. 30
+   safety?: number;          // 0 = fastest
+   errOff?: number;          // 1 = no error dialogs
+   readOnly?: number;        // 1 = open files read-only
+   trim?: boolean;           // true = Field4.str()/memoStr() strip padding spaces (default false)
+   timeout?: number;         // communications timeout in milliseconds
+   lockAttempts?: number;    // lock attempts before giving up; -1 = wait forever
+   lockAttemptsSingle?: number; // attempts for each lock in a group lock
+   lockDelay?: number;       // milliseconds between lock attempts
+   lockEnforce?: boolean | number; // true = pre-locks required for record changes
 }
 ```
 
 ```js
-const c4 = new Code4({ compatibility: 30, safety: 0, errOff: 1, readOnly: 1 });
+const c4 = new Code4({
+   compatibility: 30,
+   safety: 0,
+   errOff: 1,
+   readOnly: 1,
+   timeout: 5000,
+   lockAttempts: 3,
+   lockDelay: 250,
+   lockEnforce: true
+});
 ```
 
 | Member | Type | Description |
 |---|---|---|
 | `handle` | `bigint` | Opaque native `CODE4*` (rarely needed directly). |
 | `trim` | `boolean` | Whether `Field4.str()`/`memoStr()` trim padding spaces by default. |
-| `errorCode` | `number` | Current error code (`code4errorCode`). |
+| `errorCode` | `number` | Current error code (`code4errorCode`); assign `0` to reset it. |
+| `timeout` | `number` | Communications timeout in milliseconds (`code4timeout`/`code4timeoutSet`). |
+| `lockAttempts` | `number` | Lock attempts before giving up (`code4lockAttempts`); `-1` waits forever. |
+| `lockAttemptsSingle` | `number` | Attempts for each lock in a group lock (`code4lockAttemptsSingle`). |
+| `lockDelay` | `number` | Milliseconds between lock attempts (`code4lockDelay`). |
+| `lockEnforce` | `boolean` | Whether pre-locks are required for record changes (`code4lockEnforce`); the engine's `-1`/`0` flag is normalized. |
 | `errorText(code?)` | `string` | Description for `code` (or the current error). |
 | `open(name)` | `Data4` | Open an existing table; throws on failure. |
 | `create(name, fields, tags?)` | `Data4` | Create a table; throws on failure. |
@@ -365,6 +384,9 @@ c4.create('C:/temp/TYPES', [
 |---|---|
 | `code4initVB` / `code4initUndo` | `new Code4()` / `dispose()` |
 | `code4compatibility`, `code4safety`, `code4errOff`, `code4readOnly` | `Code4Options` |
+| `code4timeout` / `code4timeoutSet` | `timeout` |
+| `code4lockAttempts` / `code4lockAttemptsSingle` | `lockAttempts` / `lockAttemptsSingle` |
+| `code4lockDelay` / `code4lockEnforce` | `lockDelay` / `lockEnforce` |
 | `code4errorCode` / `error4text` | `errorCode` / `errorText()` |
 | `code4numCodeBaseCount` | `numCodeBaseInstances()` |
 | `d4create` / `d4open` / `d4close` | `create()` / `open()` / `close()` |
