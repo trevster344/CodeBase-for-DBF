@@ -515,6 +515,45 @@ describe('integer fields', () => {
    });
 });
 
+describe('CODE4 knobs', () => {
+   it('round-trips timeout, lock and error settings', () => {
+      const c4 = new Code4({
+         errOff: 1,
+         timeout: 2500,
+         lockAttempts: 3,
+         lockAttemptsSingle: 2,
+         lockDelay: 750,
+         lockEnforce: true
+      });
+      try {
+         expect(c4.timeout).toBe(2500);
+         expect(c4.lockAttempts).toBe(3);
+         expect(c4.lockAttemptsSingle).toBe(2);
+         expect(c4.lockDelay).toBe(750);
+         expect(c4.lockEnforce).toBe(true);
+
+         c4.timeout = 1500;
+         c4.lockAttempts = -1;
+         c4.lockAttemptsSingle = 4;
+         c4.lockDelay = 125;
+         c4.lockEnforce = false;
+         expect(c4.timeout).toBe(1500);
+         expect(c4.lockAttempts).toBe(-1);
+         expect(c4.lockAttemptsSingle).toBe(4);
+         expect(c4.lockDelay).toBe(125);
+         expect(c4.lockEnforce).toBe(false);
+
+         c4.lockEnforce = 1;
+         expect(c4.lockEnforce).toBe(true);
+
+         c4.errorCode = r4success;
+         expect(c4.errorCode).toBe(r4success);
+      } finally {
+         c4.dispose();
+      }
+   });
+});
+
 describe('error handling', () => {
    it('throws when opening a missing table', () => {
       const c4 = new Code4({ errOff: 1 });

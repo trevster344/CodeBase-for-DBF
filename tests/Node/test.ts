@@ -211,6 +211,61 @@ function testEnumerate(): number {
    }
 }
 
+function testKnobs(): number {
+   let c4: cb.Code4 | null = null;
+   try {
+      c4 = new cb.Code4({
+         errOff: 1,
+         timeout: 2500,
+         lockAttempts: 3,
+         lockAttemptsSingle: 2,
+         lockDelay: 750,
+         lockEnforce: true
+      });
+
+      if (c4.timeout !== 2500 || c4.lockAttempts !== 3 || c4.lockAttemptsSingle !== 2 ||
+          c4.lockDelay !== 750 || c4.lockEnforce !== true) {
+         console.log('  knobs     : FAIL (constructor: timeout=' + c4.timeout +
+            ', lockAttempts=' + c4.lockAttempts + ', lockAttemptsSingle=' + c4.lockAttemptsSingle +
+            ', lockDelay=' + c4.lockDelay + ', lockEnforce=' + c4.lockEnforce + ')');
+         return 1;
+      }
+
+      c4.timeout = 1500;
+      c4.lockAttempts = -1;
+      c4.lockAttemptsSingle = 4;
+      c4.lockDelay = 125;
+      c4.lockEnforce = false;
+      if (c4.timeout !== 1500 || c4.lockAttempts !== -1 || c4.lockAttemptsSingle !== 4 ||
+          c4.lockDelay !== 125 || c4.lockEnforce !== false) {
+         console.log('  knobs     : FAIL (runtime: timeout=' + c4.timeout +
+            ', lockAttempts=' + c4.lockAttempts + ', lockAttemptsSingle=' + c4.lockAttemptsSingle +
+            ', lockDelay=' + c4.lockDelay + ', lockEnforce=' + c4.lockEnforce + ')');
+         return 1;
+      }
+
+      c4.lockEnforce = 1; // numeric values are accepted too
+      if (c4.lockEnforce !== true) {
+         console.log('  knobs     : FAIL (lockEnforce numeric set did not normalize to true)');
+         return 1;
+      }
+
+      c4.errorCode = cb.r4success;
+      if (c4.errorCode !== cb.r4success) {
+         console.log('  knobs     : FAIL (errorCode reset = ' + c4.errorCode + ')');
+         return 1;
+      }
+
+      console.log('  knobs     : timeout/lockAttempts/lockAttemptsSingle/lockDelay/lockEnforce/errorCode OK');
+      return 0;
+   } catch (ex) {
+      console.log('  knobs     : EXCEPTION ' + (ex as Error).message);
+      return 1;
+   } finally {
+      if (c4) c4.dispose();
+   }
+}
+
 function checkLoadedModule(is64: boolean, rc: number): number {
    try {
       const report = (process as any).report ? (process as any).report.getReport() : null;
@@ -251,6 +306,7 @@ function main(): number {
    rc |= testLifecycle();
    rc |= testCrud();
    rc |= testEnumerate();
+   rc |= testKnobs();
    rc = checkLoadedModule(is64, rc);
 
    console.log(rc === 0 ? 'PASS' : 'FAIL');
