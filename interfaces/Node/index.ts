@@ -38,6 +38,13 @@ export const r4null = 190;
 export const r4autoIncrement = 195;
 export const r4autoTimestamp = 200;
 
+/** Flags for {@link Data4.memIndex}. */
+export const d4memIndexFlag = {
+   includeDeleted: 0x0001,
+   caseInsensitive: 0x0002,
+   checkStale: 0x0004
+} as const;
+
 /** CodeBase field type codes (char), mirroring interfaces/CSharp/Codebase.cs. */
 export const r4type = {
    bin: 'B',
@@ -72,6 +79,14 @@ export interface Code4Options {
    lockDelay?: number;
    /** When true, pre-locks are required for record modifications (via code4lockEnforce). */
    lockEnforce?: boolean | number;
+   /** Enable ephemeral in-memory indexes (default true). */
+   memIndexEnabled?: boolean | number;
+   /** Total in-memory index budget for this CODE4, in bytes (0 = unlimited). */
+   memIndexMaxBytes?: number;
+   /** Maximum number of in-memory indexes for this CODE4 (0 = unlimited). */
+   memIndexMaxIndexes?: number;
+   /** Automatically rebuild stale in-memory indexes before lookup. */
+   memIndexAutoRefresh?: boolean | number;
 }
 
 /** A FIELD4INFO entry for {@link Code4.create}. `type` is a CodeBase type code (see {@link r4type}). */
@@ -235,6 +250,10 @@ const CODE4 = defineType('CODE4', () => koffi.pointer('CODE4', koffi.opaque()));
 const DATA4 = defineType('DATA4', () => koffi.pointer('DATA4', koffi.opaque()));
 const FIELD4 = defineType('FIELD4', () => koffi.pointer('FIELD4', koffi.opaque()));
 const TAG4 = defineType('TAG4', () => koffi.pointer('TAG4', koffi.opaque()));
+const D4MEMINDEX4 = defineType('D4MEMINDEX4', () => koffi.pointer('D4MEMINDEX4', koffi.opaque()));
+const CHARPTR = koffi.pointer('char');
+const CHARPTRPTR = koffi.pointer(CHARPTR);
+const MEMINDEXPTRPTR = koffi.pointer(D4MEMINDEX4);
 const VOIDP = koffi.pointer('void');
 
 // typedef struct { char *name; short type; unsigned short len, dec, nulls; } FIELD4INFO ;
@@ -320,6 +339,30 @@ const native = {
    d4tagSelect: bind('d4tagSelect', 'void', [DATA4, TAG4]),
    d4recCountDo2: bind('d4recCountDo2', 'long', [DATA4, 'uint8']),
    d4numFields: bind('d4numFields', 'int16', [DATA4]),
+
+   // ephemeral in-memory indexes
+   code4memIndexEnabled: bind('code4memIndexEnabled', 'int', [CODE4]),
+   code4memIndexEnabledSet: bind('code4memIndexEnabledSet', 'int', [CODE4, 'int']),
+   code4memIndexLimitSet: bind('code4memIndexLimitSet', 'int', [CODE4, 'long', 'int']),
+   code4memIndexLimitGet: bind('code4memIndexLimitGet', 'int', [CODE4, VOIDP, VOIDP]),
+   code4memIndexAutoRefresh: bind('code4memIndexAutoRefresh', 'int', [CODE4]),
+   code4memIndexAutoRefreshSet: bind('code4memIndexAutoRefreshSet', 'int', [CODE4, 'int']),
+   code4memIndexMemoryUsed: bind('code4memIndexMemoryUsed', 'long', [CODE4]),
+   d4memIndexGet: bind('d4memIndexGet', D4MEMINDEX4, [DATA4, 'str', 'ulong']),
+   d4memIndexGetMany: bind('d4memIndexGetMany', 'int', [DATA4, CHARPTRPTR, 'int', 'ulong', MEMINDEXPTRPTR]),
+   d4memIndexFree: bind('d4memIndexFree', 'int', [D4MEMINDEX4]),
+   d4memIndexFreeAll: bind('d4memIndexFreeAll', 'int', [DATA4]),
+   d4memIndexRefresh: bind('d4memIndexRefresh', 'int', [D4MEMINDEX4]),
+   d4memIndexIsStale: bind('d4memIndexIsStale', 'int', [D4MEMINDEX4]),
+   d4memIndexRefreshIfStale: bind('d4memIndexRefreshIfStale', 'int', [D4MEMINDEX4]),
+   d4memIndexEstimate: bind('d4memIndexEstimate', 'long', [DATA4, 'str', 'ulong']),
+   d4memIndexMemoryUsed: bind('d4memIndexMemoryUsed', 'long', [D4MEMINDEX4]),
+   d4memIndexFind: bind('d4memIndexFind', 'long', [D4MEMINDEX4, 'str', VOIDP, 'long']),
+   d4memIndexFindDouble: bind('d4memIndexFindDouble', 'long', [D4MEMINDEX4, 'double', VOIDP, 'long']),
+   d4memIndexFindRange: bind('d4memIndexFindRange', 'long', [D4MEMINDEX4, 'str', 'str', VOIDP, 'long']),
+   d4memIndexFindRangeDouble: bind('d4memIndexFindRangeDouble', 'long', [D4MEMINDEX4, 'double', 'double', VOIDP, 'long']),
+   d4memIndexCount: bind('d4memIndexCount', 'long', [D4MEMINDEX4, 'str']),
+   d4memIndexAll: bind('d4memIndexAll', 'long', [D4MEMINDEX4, VOIDP, 'long']),
 
    // fields
    f4assignN: bind('f4assignN', 'void', [FIELD4, 'str', 'uint']),
@@ -521,6 +564,11 @@ export class Data4 {
    private _handle: bigint | null;
    private _closed: boolean;
 
+   /** Whether this Data4 has been closed. */
+   get isClosed(): boolean {
+      return this._closed;
+   }
+
    constructor(code4: Code4, handle: bigint) {
       this._code4 = code4;
       this._handle = handle;
@@ -566,6 +614,56 @@ export class Data4 {
          throw new Error('d4fieldJ(' + index + ') failed: ' + this.errorText());
       }
       return Field4.fromHandle(this, handle, this._code4.trim);
+   }
+
+   /**
+    * Get or build an ephemeral in-memory index on one field. No .cdx/tag is created; the index
+    * lives in process memory and is freed when this Data4 closes.
+    */
+   memIndex(fieldName: string, flags = d4memIndexFlag.checkStale): MemIndex4 {
+      const handle = native.d4memIndexGet(this._handle, fieldName, flags);
+      if (isNullPtr(handle)) {
+         throw new Error('d4memIndexGet(' + fieldName + ') failed: ' + this.errorText());
+      }
+      return new MemIndex4(this, handle);
+   }
+
+   /**
+    * Get or build several in-memory indexes in one scan of the table. Prefer this over calling
+    * {@link memIndex} repeatedly when building more than one index.
+    */
+   memIndexMany(fieldNames: string[], flags = d4memIndexFlag.checkStale): MemIndex4[] {
+      const n = fieldNames.length;
+      if (n === 0) return [];
+
+      const names = koffi.alloc('char *', n);
+      const out = koffi.alloc('void *', n);
+      const buffers = fieldNames.map((name) => Buffer.from(name + '\0', 'latin1'));
+      try {
+         const ptrSize = koffi.sizeof('char *');
+         for (let i = 0; i < n; i++) {
+            koffi.encode(names, i * ptrSize, 'char *', koffi.as(buffers[i], 'char *'));
+         }
+         const rc = native.d4memIndexGetMany(this._handle, names, n, flags, out);
+         if (rc < 0) {
+            throw new Error('d4memIndexGetMany failed: ' + this.errorText());
+         }
+         const handles = koffi.decode(out, 'void *', n) as bigint[];
+         return handles.map((handle) => {
+            if (isNullPtr(handle)) {
+               throw new Error('d4memIndexGetMany returned a null index');
+            }
+            return new MemIndex4(this, handle);
+         });
+      } finally {
+         koffi.free(names);
+         koffi.free(out);
+      }
+   }
+
+   /** Free all in-memory indexes attached to this Data4. */
+   freeMemIndexes(): number {
+      return native.d4memIndexFreeAll(this._handle);
    }
 
    /** Descriptors for every field, including null/auto flags (d4fieldInfo). */
@@ -704,6 +802,139 @@ export class Data4 {
    }
 }
 
+/* ---------------------------------------------------------------- MemIndex4 */
+
+/**
+ * An ephemeral in-memory index on one field. Build it with {@link Data4.memIndex}. Lookups return
+ * 1-based record numbers; position with {@link Data4.go} to read fields.
+ */
+export class MemIndex4 {
+   private _handle: bigint | null;
+   private _data: Data4;
+
+   constructor(data: Data4, handle: bigint) {
+      this._data = data;
+      this._handle = handle;
+   }
+
+   private ensureOpen(): bigint {
+      if (this._data.isClosed) throw new Error('Data4 is closed');
+      if (this._handle === null) throw new Error('MemIndex4 is freed');
+      return this._handle;
+   }
+
+   private fetch(count: number, fill: (buf: any) => number): number[] {
+      if (count <= 0) return [];
+      const buf = koffi.alloc('long', count);
+      try {
+         const written = Number(fill(buf));
+         const n = written > 0 ? Math.min(written, count) : 0;
+         if (n === 0) return [];
+         return koffi.decode(buf, 'long', n).map((v: any) => Number(v));
+      } finally {
+         koffi.free(buf);
+      }
+   }
+
+   /** Opaque native D4MEMINDEX4 pointer. */
+   get handle(): bigint {
+      if (this._handle === null) throw new Error('MemIndex4 is freed');
+      return this._handle;
+   }
+
+   /** Whether this handle has been freed or its Data4 closed. */
+   get isFreed(): boolean {
+      return this._handle === null || this._data.isClosed;
+   }
+
+   /** Exact match on a character/date/datetime key. */
+   find(key: string): number[] {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexFind(h, key, null, 0));
+      if (n < 0) throw new Error('d4memIndexFind failed: ' + this._data.errorText());
+      return this.fetch(n, (buf) => native.d4memIndexFind(h, key, buf, n));
+   }
+
+   /** Exact match on a numeric key. */
+   findDouble(key: number): number[] {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexFindDouble(h, key, null, 0));
+      if (n < 0) throw new Error('d4memIndexFindDouble failed: ' + this._data.errorText());
+      return this.fetch(n, (buf) => native.d4memIndexFindDouble(h, key, buf, n));
+   }
+
+   /** Inclusive range on a character/date/datetime key. */
+   findRange(from: string, to: string): number[] {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexFindRange(h, from, to, null, 0));
+      if (n < 0) throw new Error('d4memIndexFindRange failed: ' + this._data.errorText());
+      return this.fetch(n, (buf) => native.d4memIndexFindRange(h, from, to, buf, n));
+   }
+
+   /** Inclusive range on a numeric key. */
+   findRangeDouble(from: number, to: number): number[] {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexFindRangeDouble(h, from, to, null, 0));
+      if (n < 0) throw new Error('d4memIndexFindRangeDouble failed: ' + this._data.errorText());
+      return this.fetch(n, (buf) => native.d4memIndexFindRangeDouble(h, from, to, buf, n));
+   }
+
+   /** All record numbers in key order. */
+   all(): number[] {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexAll(h, null, 0));
+      if (n < 0) throw new Error('d4memIndexAll failed: ' + this._data.errorText());
+      return this.fetch(n, (buf) => native.d4memIndexAll(h, buf, n));
+   }
+
+   /** Count of exact matches for a character/date key. */
+   count(key: string): number {
+      const h = this.ensureOpen();
+      const n = Number(native.d4memIndexCount(h, key));
+      if (n < 0) throw new Error('d4memIndexCount failed: ' + this._data.errorText());
+      return n;
+   }
+
+   /** Rebuild the index from the current table contents. */
+   refresh(): void {
+      const rc = native.d4memIndexRefresh(this.ensureOpen());
+      if (rc < 0) throw new Error('d4memIndexRefresh failed: ' + this._data.errorText());
+   }
+
+   /** Whether the underlying table has changed since this index was built. */
+   isStale(): boolean {
+      return native.d4memIndexIsStale(this.ensureOpen()) !== 0;
+   }
+
+   /** Rebuild only if stale. */
+   refreshIfStale(): boolean {
+      const rc = native.d4memIndexRefreshIfStale(this.ensureOpen());
+      if (rc < 0) throw new Error('d4memIndexRefreshIfStale failed: ' + this._data.errorText());
+      return rc > 0;
+   }
+
+   /** Bytes held by this index. */
+   memoryUsed(): number {
+      return Number(native.d4memIndexMemoryUsed(this.ensureOpen()));
+   }
+
+   /** Release this reference. The index is freed when the last reference is released. */
+   free(): number {
+      if (this._handle === null) return r4success;
+      if (this._data.isClosed) {
+         this._handle = null;
+         return r4success;
+      }
+      const rc = native.d4memIndexFree(this._handle);
+      this._handle = null;
+      return rc;
+   }
+
+   [Symbol.dispose](): void {
+      this.free();
+   }
+}
+
 /* --------------------------------------------------------------------- Code4 */
 
 /** A CODE4 instance; the entry point to the engine. */
@@ -729,6 +960,16 @@ export class Code4 {
       if (options.lockAttemptsSingle !== undefined) this.lockAttemptsSingle = options.lockAttemptsSingle;
       if (options.lockDelay !== undefined) this.lockDelay = options.lockDelay;
       if (options.lockEnforce !== undefined) this.lockEnforce = options.lockEnforce;
+      if (options.memIndexEnabled !== undefined) this.memIndexEnabled = options.memIndexEnabled;
+      if (options.memIndexMaxBytes !== undefined || options.memIndexMaxIndexes !== undefined) {
+         const limits = this.memIndexLimits;
+         this.memIndexLimits = {
+            maxBytes: options.memIndexMaxBytes ?? limits.maxBytes,
+            maxIndexes: options.memIndexMaxIndexes ?? limits.maxIndexes
+         };
+      }
+      if (options.memIndexAutoRefresh !== undefined) this.memIndexAutoRefresh = options.memIndexAutoRefresh;
+      else this.memIndexAutoRefresh = true;
    }
 
    /** Opaque native CODE4 pointer. */
@@ -799,6 +1040,54 @@ export class Code4 {
       native.code4lockEnforce(this._handle, value ? 1 : 0);
    }
 
+   /** Whether ephemeral in-memory indexes are allowed (code4memIndexEnabled). */
+   get memIndexEnabled(): boolean {
+      return native.code4memIndexEnabled(this._handle) !== 0;
+   }
+
+   set memIndexEnabled(value: boolean | number) {
+      native.code4memIndexEnabledSet(this._handle, value ? 1 : 0);
+   }
+
+   /** Current in-memory index budget and count limit (0 = unlimited for either). */
+   get memIndexLimits(): { maxBytes: number; maxIndexes: number } {
+      const bytes = koffi.alloc('long', 1);
+      const count = koffi.alloc('int', 1);
+      try {
+         native.code4memIndexLimitGet(this._handle, bytes, count);
+         return {
+            maxBytes: Number(koffi.decode(bytes, 'long', 1)[0]),
+            maxIndexes: Number(koffi.decode(count, 'int', 1)[0])
+         };
+      } finally {
+         koffi.free(bytes);
+         koffi.free(count);
+      }
+   }
+
+   set memIndexLimits(value: { maxBytes?: number; maxIndexes?: number }) {
+      const current = this.memIndexLimits;
+      native.code4memIndexLimitSet(
+         this._handle,
+         value.maxBytes ?? current.maxBytes,
+         value.maxIndexes ?? current.maxIndexes
+      );
+   }
+
+   /** Whether stale in-memory indexes rebuild automatically before lookup. */
+   get memIndexAutoRefresh(): boolean {
+      return native.code4memIndexAutoRefresh(this._handle) !== 0;
+   }
+
+   set memIndexAutoRefresh(value: boolean | number) {
+      native.code4memIndexAutoRefreshSet(this._handle, value ? 1 : 0);
+   }
+
+   /** Bytes currently held by in-memory indexes in this CODE4. */
+   get memIndexMemoryUsed(): number {
+      return Number(native.code4memIndexMemoryUsed(this._handle));
+   }
+
    /** Error description for `code` (or the current error). */
    errorText(code?: number): string {
       const c = code === undefined ? this.errorCode : code;
@@ -867,6 +1156,7 @@ const api = {
    Code4,
    Data4,
    Field4,
+   MemIndex4,
    r4success,
    r4found,
    r4after,
@@ -876,6 +1166,7 @@ const api = {
    r4autoIncrement,
    r4autoTimestamp,
    r4type,
+   d4memIndexFlag,
    Field4info,
    Tag4info
 };

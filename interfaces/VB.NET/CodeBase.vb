@@ -1,5 +1,6 @@
 Option Strict Off
 Option Explicit On
+Imports System.Runtime.InteropServices
 
 Module CodeBase
     ' codebase.vb  (c)Copyright Sequiter Software Inc., 1988-2011.  All rights reserved.
@@ -288,6 +289,27 @@ Module CodeBase
     Declare Function d4logStatus Lib "d4dll.dll"  Alias "d4logStatusCB"(ByVal d4 As Integer) As Short
     Declare Function d4memoCompress Lib "d4dll.dll" (ByVal d4 As Integer) As Short
     Declare Function d4numFields Lib "d4dll.dll" (ByVal d4 As Integer) As Short
+    Declare Function code4memIndexEnabled Lib "d4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function code4memIndexEnabledSet Lib "d4dll.dll" (ByVal c4 As Integer, ByVal enabled As Integer) As Integer
+    Declare Function code4memIndexLimitSet Lib "d4dll.dll" (ByVal c4 As Integer, ByVal maxBytes As Integer, ByVal maxIndexes As Integer) As Integer
+    Declare Function code4memIndexLimitGet Lib "d4dll.dll" (ByVal c4 As Integer, ByRef maxBytes As Integer, ByRef maxIndexes As Integer) As Integer
+    Declare Function code4memIndexAutoRefresh Lib "d4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function code4memIndexAutoRefreshSet Lib "d4dll.dll" (ByVal c4 As Integer, ByVal enabled As Integer) As Integer
+    Declare Function code4memIndexMemoryUsed Lib "d4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function d4memIndexGet Lib "d4dll.dll" (ByVal d4 As Integer, ByVal fieldName As String, ByVal flags As Integer) As Integer
+    Declare Function d4memIndexFree Lib "d4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexFreeAll Lib "d4dll.dll" (ByVal d4 As Integer) As Integer
+    Declare Function d4memIndexRefresh Lib "d4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexIsStale Lib "d4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexRefreshIfStale Lib "d4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexEstimate Lib "d4dll.dll" (ByVal d4 As Integer, ByVal fieldName As String, ByVal flags As Integer) As Integer
+    Declare Function d4memIndexMemoryUsed Lib "d4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexFind Lib "d4dll.dll" (ByVal idx As Integer, ByVal key As String, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindDouble Lib "d4dll.dll" (ByVal idx As Integer, ByVal key As Double, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindRange Lib "d4dll.dll" (ByVal idx As Integer, ByVal fromKey As String, ByVal toKey As String, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindRangeDouble Lib "d4dll.dll" (ByVal idx As Integer, ByVal fromKey As Double, ByVal toKey As Double, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexCount Lib "d4dll.dll" (ByVal idx As Integer, ByVal key As String) As Integer
+    Declare Function d4memIndexAll Lib "d4dll.dll" (ByVal idx As Integer, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
     Declare Function d4open Lib "d4dll.dll" (ByVal c4 As Integer, ByVal DbfName As String) As Integer
     Declare Function d4openClone Lib "d4dll.dll" (ByVal d4 As Integer) As Integer
     Declare Function d4optimize Lib "d4dll.dll"  Alias "d4optimizeVB"(ByVal d4 As Integer, ByVal OptFlag As Short) As Short
@@ -373,6 +395,27 @@ Module CodeBase
     Declare Function d4logStatus Lib "c4dll.dll" Alias "d4logStatusCB" (ByVal d4 As Integer) As Short
     Declare Function d4memoCompress Lib "c4dll.dll" (ByVal d4 As Integer) As Short
     Declare Function d4numFields Lib "c4dll.dll" (ByVal d4 As Integer) As Short
+    Declare Function code4memIndexEnabled Lib "c4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function code4memIndexEnabledSet Lib "c4dll.dll" (ByVal c4 As Integer, ByVal enabled As Integer) As Integer
+    Declare Function code4memIndexLimitSet Lib "c4dll.dll" (ByVal c4 As Integer, ByVal maxBytes As Integer, ByVal maxIndexes As Integer) As Integer
+    Declare Function code4memIndexLimitGet Lib "c4dll.dll" (ByVal c4 As Integer, ByRef maxBytes As Integer, ByRef maxIndexes As Integer) As Integer
+    Declare Function code4memIndexAutoRefresh Lib "c4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function code4memIndexAutoRefreshSet Lib "c4dll.dll" (ByVal c4 As Integer, ByVal enabled As Integer) As Integer
+    Declare Function code4memIndexMemoryUsed Lib "c4dll.dll" (ByVal c4 As Integer) As Integer
+    Declare Function d4memIndexGet Lib "c4dll.dll" (ByVal d4 As Integer, ByVal fieldName As String, ByVal flags As Integer) As Integer
+    Declare Function d4memIndexFree Lib "c4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexFreeAll Lib "c4dll.dll" (ByVal d4 As Integer) As Integer
+    Declare Function d4memIndexRefresh Lib "c4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexIsStale Lib "c4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexRefreshIfStale Lib "c4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexEstimate Lib "c4dll.dll" (ByVal d4 As Integer, ByVal fieldName As String, ByVal flags As Integer) As Integer
+    Declare Function d4memIndexMemoryUsed Lib "c4dll.dll" (ByVal idx As Integer) As Integer
+    Declare Function d4memIndexFind Lib "c4dll.dll" (ByVal idx As Integer, ByVal key As String, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindDouble Lib "c4dll.dll" (ByVal idx As Integer, ByVal key As Double, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindRange Lib "c4dll.dll" (ByVal idx As Integer, ByVal fromKey As String, ByVal toKey As String, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexFindRangeDouble Lib "c4dll.dll" (ByVal idx As Integer, ByVal fromKey As Double, ByVal toKey As Double, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
+    Declare Function d4memIndexCount Lib "c4dll.dll" (ByVal idx As Integer, ByVal key As String) As Integer
+    Declare Function d4memIndexAll Lib "c4dll.dll" (ByVal idx As Integer, ByVal recNos As IntPtr, ByVal maxRecs As Integer) As Integer
     Declare Function d4open Lib "c4dll.dll" (ByVal c4 As Integer, ByVal DbfName As String) As Integer
     Declare Function d4openClone Lib "c4dll.dll" (ByVal d4 As Integer) As Integer
     Declare Function d4optimize Lib "c4dll.dll" Alias "d4optimizeVB" (ByVal d4 As Integer, ByVal OptFlag As Short) As Short
@@ -1750,4 +1793,70 @@ Module CodeBase
         End Sub
     End Class
 #End If
+
+    ' ------------------------------------------------------------------ in-memory indexes
+    Public Function MemIndexFind(ByVal idx As Integer, ByVal key As String) As Integer()
+        Dim n As Integer = d4memIndexFind(idx, key, IntPtr.Zero, 0)
+        If n <= 0 Then Return New Integer() {}
+        Dim recs(n - 1) As Integer
+        Dim pinned As GCHandle = GCHandle.Alloc(recs, GCHandleType.Pinned)
+        Try
+            d4memIndexFind(idx, key, pinned.AddrOfPinnedObject(), n)
+        Finally
+            pinned.Free()
+        End Try
+        Return recs
+    End Function
+
+    Public Function MemIndexFind(ByVal idx As Integer, ByVal key As Double) As Integer()
+        Dim n As Integer = d4memIndexFindDouble(idx, key, IntPtr.Zero, 0)
+        If n <= 0 Then Return New Integer() {}
+        Dim recs(n - 1) As Integer
+        Dim pinned As GCHandle = GCHandle.Alloc(recs, GCHandleType.Pinned)
+        Try
+            d4memIndexFindDouble(idx, key, pinned.AddrOfPinnedObject(), n)
+        Finally
+            pinned.Free()
+        End Try
+        Return recs
+    End Function
+
+    Public Function MemIndexFindRange(ByVal idx As Integer, ByVal fromKey As String, ByVal toKey As String) As Integer()
+        Dim n As Integer = d4memIndexFindRange(idx, fromKey, toKey, IntPtr.Zero, 0)
+        If n <= 0 Then Return New Integer() {}
+        Dim recs(n - 1) As Integer
+        Dim pinned As GCHandle = GCHandle.Alloc(recs, GCHandleType.Pinned)
+        Try
+            d4memIndexFindRange(idx, fromKey, toKey, pinned.AddrOfPinnedObject(), n)
+        Finally
+            pinned.Free()
+        End Try
+        Return recs
+    End Function
+
+    Public Function MemIndexFindRange(ByVal idx As Integer, ByVal fromKey As Double, ByVal toKey As Double) As Integer()
+        Dim n As Integer = d4memIndexFindRangeDouble(idx, fromKey, toKey, IntPtr.Zero, 0)
+        If n <= 0 Then Return New Integer() {}
+        Dim recs(n - 1) As Integer
+        Dim pinned As GCHandle = GCHandle.Alloc(recs, GCHandleType.Pinned)
+        Try
+            d4memIndexFindRangeDouble(idx, fromKey, toKey, pinned.AddrOfPinnedObject(), n)
+        Finally
+            pinned.Free()
+        End Try
+        Return recs
+    End Function
+
+    Public Function MemIndexAll(ByVal idx As Integer) As Integer()
+        Dim n As Integer = d4memIndexAll(idx, IntPtr.Zero, 0)
+        If n <= 0 Then Return New Integer() {}
+        Dim recs(n - 1) As Integer
+        Dim pinned As GCHandle = GCHandle.Alloc(recs, GCHandleType.Pinned)
+        Try
+            d4memIndexAll(idx, pinned.AddrOfPinnedObject(), n)
+        Finally
+            pinned.Free()
+        End Try
+        Return recs
+    End Function
 End Module

@@ -288,6 +288,27 @@ End Type
     Declare Function d4logStatus% Lib "d4dll.dll" Alias "d4logStatusCB" (ByVal d4&)
     Declare Function d4memoCompress% Lib "d4dll.dll" (ByVal d4&)
     Declare Function d4numFields% Lib "d4dll.dll" (ByVal d4&)
+    Declare Function code4memIndexEnabled% Lib "d4dll.dll" (ByVal c4&)
+    Declare Function code4memIndexEnabledSet% Lib "d4dll.dll" (ByVal c4&, ByVal enabled%)
+    Declare Function code4memIndexLimitSet% Lib "d4dll.dll" (ByVal c4&, ByVal maxBytes&, ByVal maxIndexes%)
+    Declare Function code4memIndexLimitGet% Lib "d4dll.dll" (ByVal c4&, ByRef maxBytes&, ByRef maxIndexes%)
+    Declare Function code4memIndexAutoRefresh% Lib "d4dll.dll" (ByVal c4&)
+    Declare Function code4memIndexAutoRefreshSet% Lib "d4dll.dll" (ByVal c4&, ByVal enabled%)
+    Declare Function code4memIndexMemoryUsed& Lib "d4dll.dll" (ByVal c4&)
+    Declare Function d4memIndexGet& Lib "d4dll.dll" (ByVal d4&, ByVal fieldName$, ByVal flags&)
+    Declare Function d4memIndexFree% Lib "d4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexFreeAll% Lib "d4dll.dll" (ByVal d4&)
+    Declare Function d4memIndexRefresh% Lib "d4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexIsStale% Lib "d4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexRefreshIfStale% Lib "d4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexEstimate& Lib "d4dll.dll" (ByVal d4&, ByVal fieldName$, ByVal flags&)
+    Declare Function d4memIndexMemoryUsed& Lib "d4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexFind& Lib "d4dll.dll" (ByVal idx&, ByVal key$, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindDouble& Lib "d4dll.dll" (ByVal idx&, ByVal key#, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindRange& Lib "d4dll.dll" (ByVal idx&, ByVal fromKey$, ByVal toKey$, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindRangeDouble& Lib "d4dll.dll" (ByVal idx&, ByVal fromKey#, ByVal toKey#, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexCount& Lib "d4dll.dll" (ByVal idx&, ByVal key$)
+    Declare Function d4memIndexAll& Lib "d4dll.dll" (ByVal idx&, ByRef recNos As Long, ByVal maxRecs&)
     Declare Function d4open& Lib "d4dll.dll" (ByVal c4&, ByVal DbfName$)
     Declare Function d4openClone& Lib "d4dll.dll" (ByVal d4&)
     Declare Function d4optimize% Lib "d4dll.dll" Alias "d4optimizeVB" (ByVal d4&, ByVal OptFlag%)
@@ -370,6 +391,27 @@ End Type
     Declare Function d4logStatus% Lib "c4dll.dll" Alias "d4logStatusCB" (ByVal d4&)
     Declare Function d4memoCompress% Lib "c4dll.dll" (ByVal d4&)
     Declare Function d4numFields% Lib "c4dll.dll" (ByVal d4&)
+    Declare Function code4memIndexEnabled% Lib "c4dll.dll" (ByVal c4&)
+    Declare Function code4memIndexEnabledSet% Lib "c4dll.dll" (ByVal c4&, ByVal enabled%)
+    Declare Function code4memIndexLimitSet% Lib "c4dll.dll" (ByVal c4&, ByVal maxBytes&, ByVal maxIndexes%)
+    Declare Function code4memIndexLimitGet% Lib "c4dll.dll" (ByVal c4&, ByRef maxBytes&, ByRef maxIndexes%)
+    Declare Function code4memIndexAutoRefresh% Lib "c4dll.dll" (ByVal c4&)
+    Declare Function code4memIndexAutoRefreshSet% Lib "c4dll.dll" (ByVal c4&, ByVal enabled%)
+    Declare Function code4memIndexMemoryUsed& Lib "c4dll.dll" (ByVal c4&)
+    Declare Function d4memIndexGet& Lib "c4dll.dll" (ByVal d4&, ByVal fieldName$, ByVal flags&)
+    Declare Function d4memIndexFree% Lib "c4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexFreeAll% Lib "c4dll.dll" (ByVal d4&)
+    Declare Function d4memIndexRefresh% Lib "c4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexIsStale% Lib "c4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexRefreshIfStale% Lib "c4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexEstimate& Lib "c4dll.dll" (ByVal d4&, ByVal fieldName$, ByVal flags&)
+    Declare Function d4memIndexMemoryUsed& Lib "c4dll.dll" (ByVal idx&)
+    Declare Function d4memIndexFind& Lib "c4dll.dll" (ByVal idx&, ByVal key$, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindDouble& Lib "c4dll.dll" (ByVal idx&, ByVal key#, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindRange& Lib "c4dll.dll" (ByVal idx&, ByVal fromKey$, ByVal toKey$, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexFindRangeDouble& Lib "c4dll.dll" (ByVal idx&, ByVal fromKey#, ByVal toKey#, ByRef recNos As Long, ByVal maxRecs&)
+    Declare Function d4memIndexCount& Lib "c4dll.dll" (ByVal idx&, ByVal key$)
+    Declare Function d4memIndexAll& Lib "c4dll.dll" (ByVal idx&, ByRef recNos As Long, ByVal maxRecs&)
     Declare Function d4open& Lib "c4dll.dll" (ByVal c4&, ByVal DbfName$)
     Declare Function d4openClone& Lib "c4dll.dll" (ByVal d4&)
     Declare Function d4optimize% Lib "c4dll.dll" Alias "d4optimizeVB" (ByVal d4&, ByVal OptFlag%)
@@ -1717,4 +1759,74 @@ Private Function RTrimNulls$(str$)
     Next
 
     RTrimNulls = str
+End Function
+
+' ------------------------------------------------------------------ in-memory indexes
+Public Function CB_MemIndexFind(ByVal idx As Long, ByVal key As String, ByRef outRecs() As Long) As Long
+    Dim n As Long
+    n = d4memIndexCount(idx, key)
+    If n <= 0 Then
+        Erase outRecs
+        CB_MemIndexFind = 0
+        Exit Function
+    End If
+    ReDim outRecs(0 To n - 1)
+    d4memIndexFind idx, key, outRecs(0), n
+    CB_MemIndexFind = n
+End Function
+
+Public Function CB_MemIndexFindDouble(ByVal idx As Long, ByVal key As Double, ByRef outRecs() As Long) As Long
+    Dim n As Long
+    Dim dummy As Long
+    n = d4memIndexFindDouble(idx, key, dummy, 0)
+    If n <= 0 Then
+        Erase outRecs
+        CB_MemIndexFindDouble = 0
+        Exit Function
+    End If
+    ReDim outRecs(0 To n - 1)
+    d4memIndexFindDouble idx, key, outRecs(0), n
+    CB_MemIndexFindDouble = n
+End Function
+
+Public Function CB_MemIndexFindRange(ByVal idx As Long, ByVal fromKey As String, ByVal toKey As String, ByRef outRecs() As Long) As Long
+    Dim n As Long
+    Dim dummy As Long
+    n = d4memIndexFindRange(idx, fromKey, toKey, dummy, 0)
+    If n <= 0 Then
+        Erase outRecs
+        CB_MemIndexFindRange = 0
+        Exit Function
+    End If
+    ReDim outRecs(0 To n - 1)
+    d4memIndexFindRange idx, fromKey, toKey, outRecs(0), n
+    CB_MemIndexFindRange = n
+End Function
+
+Public Function CB_MemIndexAll(ByVal idx As Long, ByRef outRecs() As Long) As Long
+    Dim n As Long
+    Dim dummy As Long
+    n = d4memIndexAll(idx, dummy, 0)
+    If n <= 0 Then
+        Erase outRecs
+        CB_MemIndexAll = 0
+        Exit Function
+    End If
+    ReDim outRecs(0 To n - 1)
+    d4memIndexAll idx, outRecs(0), n
+    CB_MemIndexAll = n
+End Function
+
+Public Function CB_MemIndexFindRangeDouble(ByVal idx As Long, ByVal fromKey As Double, ByVal toKey As Double, ByRef outRecs() As Long) As Long
+    Dim n As Long
+    Dim dummy As Long
+    n = d4memIndexFindRangeDouble(idx, fromKey, toKey, dummy, 0)
+    If n <= 0 Then
+        Erase outRecs
+        CB_MemIndexFindRangeDouble = 0
+        Exit Function
+    End If
+    ReDim outRecs(0 To n - 1)
+    d4memIndexFindRangeDouble idx, fromKey, toKey, outRecs(0), n
+    CB_MemIndexFindRangeDouble = n
 End Function

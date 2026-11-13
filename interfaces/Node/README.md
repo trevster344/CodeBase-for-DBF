@@ -146,6 +146,40 @@ by name (case-insensitive in CodeBase).
 A tag is an index. `create()` takes an array of tags; `seek()` searches the **currently selected**
 tag, so call `select(tagName)` first when a table has more than one tag.
 
+### In-memory indexes (no tag)
+
+`Data4.memIndex(fieldName, flags?)` builds an ephemeral, per-process lookup index on one field.
+It creates **no** `.cdx` tag and is freed when the `Data4` closes (or when `free()` is called).
+
+```js
+import { d4memIndexFlag } from '@trevster344/codebase';
+
+const byDate = data.memIndex('ADATE');
+const hits = byDate.find('20260115');            // 1-based record numbers
+const range = byDate.findRange('20260101', '20260131');
+const sorted = byDate.all();                    // all recnos in date order
+const count = byDate.count('20260115');
+
+// Build several indexes in one table scan:
+const [byProgram2, byDate2] = data.memIndexMany(['PROGRAM_ID', 'ADATE']);
+
+for (const rec of range) {
+   data.goLow(rec, 0);
+   console.log(data.field('PROGRAM_ID').str());
+}
+
+byDate.free();                                  // optional; Data4.close() also frees
+```
+
+- No disk file, no tag maintenance, no reindex.
+- `findRange` and `all` return record numbers **already in key order**.
+- `memIndex()` is get-or-create: the same field + flags returns the same store.
+- By default the Node wrapper uses `d4memIndexFlag.checkStale` and rebuilds stale indexes before
+  lookup. Pass `0` for snapshot semantics, or call `byDate.refreshIfStale()` yourself.
+- `Code4` options: `memIndexEnabled`, `memIndexMaxBytes`, `memIndexMaxIndexes`,
+  `memIndexAutoRefresh`. Defaults are enabled, 64 MB, 32 indexes, auto-refresh on.
+- Memo/general fields are not supported in v1; use tags or a full-text index for those.
+
 ### Errors
 
 CodeBase reports failures as numeric error codes; `r4success` is `0`. The wrapper **throws** when a
@@ -180,6 +214,10 @@ interface Code4Options {
    lockAttemptsSingle?: number; // attempts for each lock in a group lock
    lockDelay?: number;       // milliseconds between lock attempts
    lockEnforce?: boolean | number; // true = pre-locks required for record changes
+   memIndexEnabled?: boolean | number;     // default true
+   memIndexMaxBytes?: number;              // default 64 MB; 0 = unlimited
+   memIndexMaxIndexes?: number;            // default 32; 0 = unlimited
+   memIndexAutoRefresh?: boolean | number; // default true in Node
 }
 ```
 
@@ -226,6 +264,9 @@ const c4 = new Code4({
 | `appendBlank()` | `number` | Append an empty record and move to it. |
 | `field(name)` | `Field4` | Get a field handle; throws if the field does not exist. |
 | `fieldAt(index)` | `Field4` | Field handle by 1-based position (`d4fieldJ`); throws when out of range. |
+| `memIndex(field, flags?)` | `MemIndex4` | Get/build an ephemeral in-memory index on one field (`d4memIndexGet`). |
+| `memIndexMany(fields, flags?)` | `MemIndex4[]` | Build several indexes in one table scan (`d4memIndexGetMany`). |
+| `freeMemIndexes()` | `number` | Free all in-memory indexes on this file (`d4memIndexFreeAll`). |
 | `fields()` | `FieldInfo[]` | Descriptors for every field, incl. null/auto flags (`d4fieldInfo`). |
 | `fieldNames()` | `string[]` | Field names in order. |
 | `go(recNo)` | `number` | Move to a 1-based record number (same as `goLow(recNo, 1)`). |
@@ -247,6 +288,25 @@ const c4 = new Code4({
 | `pack()` | `number` | Physically remove deleted records and rebuild tags (`d4pack`). |
 | `reindex()` | `number` | Rebuild all tags (`d4reindex`). |
 | `close()` | `number` | Close the file; idempotent. |
+
+### `MemIndex4`
+
+Returned by `Data4.memIndex()`. It is a snapshot of one field, kept in process memory.
+
+| Member | Type | Description |
+|---|---|---|
+| `find(key)` | `number[]` | Exact match for a character/date/datetime key. |
+| `findDouble(key)` | `number[]` | Exact match for a numeric key. |
+| `findRange(from, to)` | `number[]` | Inclusive range, returned in key order. |
+| `findRangeDouble(from, to)` | `number[]` | Inclusive numeric range, returned in key order. |
+| `all()` | `number[]` | All record numbers in key order. |
+| `count(key)` | `number` | Count of exact matches. |
+| `refresh()` | `void` | Rebuild from the current table. |
+| `isStale()` | `boolean` | Whether the table changed since the build. |
+| `refreshIfStale()` | `boolean` | Rebuild only if stale; returns `true` if rebuilt. |
+| `memoryUsed()` | `number` | Bytes held by this index. |
+| `free()` | `number` | Release this reference (freed when the last reference is released). |
+| `isFreed` | `boolean` | Whether this handle is freed or its `Data4` is closed. |
 
 ### `Field4`
 

@@ -735,6 +735,10 @@ int S4FUNCTION d4copyTable( DATA4 *data, const char *destFolder, short includeIn
 
       CODE4 *c4 = d4->codeBase ;
 
+      #ifndef S4OFF_MEMINDEX
+         d4memIndexFreeAll( d4 ) ;
+      #endif
+
       // AS 11/29/00 don't allow adding a field within a transaction...
       #ifndef S4OFF_TRAN
          #ifdef S4SERVER
@@ -913,6 +917,10 @@ int S4FUNCTION d4copyTable( DATA4 *data, const char *destFolder, short includeIn
       CODE4 *c4 = d4->codeBase ;
       if ( error4code( c4 ) < 0 )
          return 0 ;
+
+      #ifndef S4OFF_MEMINDEX
+         d4memIndexFreeAll( d4 ) ;
+      #endif
 
       #ifdef S4CLIENT
          CONNECTION4 *connection = &c4->defaultServer ;
@@ -1430,6 +1438,10 @@ int S4FUNCTION d4copyTable( DATA4 *data, const char *destFolder, short includeIn
          return *d4 ;
 
       CODE4 *c4 = (*d4)->codeBase ;
+
+      #ifndef S4OFF_MEMINDEX
+         d4memIndexFreeAll( *d4 ) ;
+      #endif
 
       if ( error4code( c4 ) < 0 )
          return 0 ;

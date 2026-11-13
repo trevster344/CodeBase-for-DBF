@@ -36,6 +36,7 @@ d4info.c
 d4inline.c
 d4lock.c
 d4modify.c
+d4memidx.c
 d4open.c
 d4opt.c
 d4pack.c

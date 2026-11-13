@@ -42,6 +42,7 @@ class Program
       int rc = 0;
       rc |= TestLifecycle();
       rc |= TestCrud();
+      rc |= TestMemIndex();
 
       // The engine is loaded lazily on the first P/Invoke, so check the module after the tests.
       foreach (System.Diagnostics.ProcessModule m in System.Diagnostics.Process.GetCurrentProcess().Modules)
@@ -207,6 +208,125 @@ class Program
       catch (Exception ex)
       {
          Console.WriteLine("  crud      : EXCEPTION " + ex.GetType().Name + ": " + ex.Message);
+         return 1;
+      }
+      finally
+      {
+         if (cb != null) cb.Dispose();
+         DeleteTable(table);
+      }
+   }
+
+   private static int TestMemIndex()
+   {
+      string dir = Path.Combine(Path.GetTempPath(), "codebase_tests");
+      Directory.CreateDirectory(dir);
+      string table = Path.Combine(dir, "MEMIDXTEST");
+      DeleteTable(table);
+
+      Code4 cb = null;
+      try
+      {
+         cb = new Code4();
+         cb.compatibility = 30;
+         cb.safety = 0;
+         cb.errOff = 1;
+         cb.readOnly = 0;
+         cb.memIndexLimitSet(16 * 1024 * 1024, 8);
+         cb.memIndexAutoRefresh = true;
+
+         Field4info fields = new Field4info(ref cb);
+         fields.add("PROGRAM_ID", Code4.r4str, 10, 0, 0);
+         fields.add("ADATE", Code4.r4date, 8, 0, 0);
+         fields.add("AMT", Code4.r4num, 8, 2, 0);
+
+         Data4 data = new Data4();
+         data.create(ref cb, table, ref fields);
+         if (data.isValid() == 0)
+         {
+            Console.WriteLine("  memindex  : FAIL (d4create) " + cb.errorText(cb.errorCode));
+            return 1;
+         }
+
+         const int N = 1000;
+         data.appendStart(0);
+         for (int i = 0; i < N; i++)
+         {
+            data.appendBlank();
+            new Field4(data, "PROGRAM_ID").assign("P" + (i % 10));
+            new Field4(data, "ADATE").assign("202601" + ((i % 28) + 1).ToString("00"));
+            new Field4(data, "AMT").assign(i.ToString());
+         }
+         data.flush();
+         data.close();
+
+         Data4 d2 = new Data4();
+         d2.open(ref cb, table);
+         if (d2.isValid() == 0)
+         {
+            Console.WriteLine("  memindex  : FAIL (d4open) " + cb.errorText(cb.errorCode));
+            return 1;
+         }
+
+         MemIndex4[] indexes = d2.MemIndexMany(new string[] { "ADATE", "PROGRAM_ID" }, Code4.D4MEMINDEX_CHECK_STALE);
+         MemIndex4 byDate = indexes[0];
+         MemIndex4 byProgram = indexes[1];
+         int[] hits = byDate.Find("20260115");
+         if (hits.Length != 36)
+         {
+            Console.WriteLine("  memindex  : FAIL (date hits = " + hits.Length + ", expected 36)");
+            return 1;
+         }
+
+         int[] range = byDate.FindRange("20260105", "20260110");
+         if (range.Length != 6 * 36)
+         {
+            Console.WriteLine("  memindex  : FAIL (range hits = " + range.Length + ", expected 216)");
+            return 1;
+         }
+
+         int[] all = byDate.All();
+         if (all.Length != N)
+         {
+            Console.WriteLine("  memindex  : FAIL (all = " + all.Length + ", expected " + N + ")");
+            return 1;
+         }
+
+         if (byProgram.Find("P3").Length != 100)
+         {
+            Console.WriteLine("  memindex  : FAIL (P3 hits = " + byProgram.Find("P3").Length + ", expected 100)");
+            return 1;
+         }
+
+         // stale detection / auto refresh
+         d2.appendStart(0);
+         d2.appendBlank();
+         new Field4(d2, "PROGRAM_ID").assign("P3");
+         new Field4(d2, "ADATE").assign("20260115");
+         new Field4(d2, "AMT").assign("1");
+         d2.flush();
+
+         if (!byDate.IsStale())
+         {
+            Console.WriteLine("  memindex  : FAIL (index not marked stale after append)");
+            return 1;
+         }
+         int[] after = byDate.Find("20260115");
+         if (after.Length != 37)
+         {
+            Console.WriteLine("  memindex  : FAIL (auto-refresh hits = " + after.Length + ", expected 37)");
+            return 1;
+         }
+
+         byDate.Free();
+         byProgram.Free();
+         d2.close();
+         Console.WriteLine("  memindex  : build/find/range/all/stale OK");
+         return 0;
+      }
+      catch (Exception ex)
+      {
+         Console.WriteLine("  memindex  : EXCEPTION " + ex.GetType().Name + ": " + ex.Message);
          return 1;
       }
       finally

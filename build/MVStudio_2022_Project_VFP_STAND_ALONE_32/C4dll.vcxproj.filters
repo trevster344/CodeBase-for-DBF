@@ -87,6 +87,9 @@
     <ClCompile Include="..\..\WorkingSource\D4file.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\WorkingSource\D4memidx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\WorkingSource\D4flush.c">
       <Filter>Source Files</Filter>
     </ClCompile>

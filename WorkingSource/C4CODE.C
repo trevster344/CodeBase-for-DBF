@@ -998,6 +998,15 @@ int S4FUNCTION code4initLow( CODE4 *c4, const char *defaultProtocol, long versio
    c4->autoOpen = 1 ;
    c4->safety = 1 ;
 
+   #ifndef S4OFF_MEMINDEX
+      c4->memIndexEnabled = 1 ;
+      c4->memIndexMaxBytes = 64L * 1024L * 1024L ;
+      c4->memIndexMaxCount = 32 ;
+      c4->memIndexAutoRefresh = 0 ;
+      c4->memIndexBytesUsed = 0 ;
+      c4->memIndexCount = 0 ;
+   #endif
+
    #ifndef S4OFF_MULTI
       c4->lockDelay = 100 ;
    #endif

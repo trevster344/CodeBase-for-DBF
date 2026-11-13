@@ -670,6 +670,47 @@ S4EXPORT int S4FUNCTION d4top( DATA4 S4PTR * ) ;
 S4EXPORT int S4FUNCTION d4unappend( DATA4 * ) ;  /* internal only */
 S4EXPORT int S4FUNCTION d4writeLow( DATA4 S4PTR *, const long, const int, const int ) ;
 S4EXPORT int S4FUNCTION d4zap( DATA4 S4PTR *, const long, const long ) ;
+
+#ifndef S4OFF_MEMINDEX
+   typedef struct D4MEMINDEX4St D4MEMINDEX4 ;
+
+   #ifndef E9MI01
+      #define E9MI01  90201
+      #define E9MI02  90202
+      #define E9MI03  90203
+      #define E9MI04  90204
+      #define E9MI05  90205
+      #define E9MI06  90206
+   #endif
+
+   #define D4MEMINDEX_INCLUDE_DELETED    0x0001
+   #define D4MEMINDEX_CASE_INSENSITIVE   0x0002
+   #define D4MEMINDEX_CHECK_STALE        0x0004
+
+   S4EXPORT int S4FUNCTION code4memIndexEnabled( CODE4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION code4memIndexEnabledSet( CODE4 S4PTR *, int ) ;
+   S4EXPORT int S4FUNCTION code4memIndexLimitSet( CODE4 S4PTR *, long, int ) ;
+   S4EXPORT int S4FUNCTION code4memIndexLimitGet( CODE4 S4PTR *, long S4PTR *, int S4PTR * ) ;
+   S4EXPORT int S4FUNCTION code4memIndexAutoRefresh( CODE4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION code4memIndexAutoRefreshSet( CODE4 S4PTR *, int ) ;
+   S4EXPORT long S4FUNCTION code4memIndexMemoryUsed( CODE4 S4PTR * ) ;
+
+   S4EXPORT D4MEMINDEX4 S4PTR *S4FUNCTION d4memIndexGet( DATA4 S4PTR *, const char S4PTR *, unsigned long ) ;
+   S4EXPORT int S4FUNCTION d4memIndexGetMany( DATA4 S4PTR *, const char S4PTR * const S4PTR *, int, unsigned long, D4MEMINDEX4 S4PTR * S4PTR * ) ;
+   S4EXPORT int S4FUNCTION d4memIndexFree( D4MEMINDEX4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION d4memIndexFreeAll( DATA4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION d4memIndexRefresh( D4MEMINDEX4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION d4memIndexIsStale( D4MEMINDEX4 S4PTR * ) ;
+   S4EXPORT int S4FUNCTION d4memIndexRefreshIfStale( D4MEMINDEX4 S4PTR * ) ;
+   S4EXPORT long S4FUNCTION d4memIndexEstimate( DATA4 S4PTR *, const char S4PTR *, unsigned long ) ;
+   S4EXPORT long S4FUNCTION d4memIndexMemoryUsed( D4MEMINDEX4 S4PTR * ) ;
+   S4EXPORT long S4FUNCTION d4memIndexFind( D4MEMINDEX4 S4PTR *, const char S4PTR *, long S4PTR *, long ) ;
+   S4EXPORT long S4FUNCTION d4memIndexFindDouble( D4MEMINDEX4 S4PTR *, double, long S4PTR *, long ) ;
+   S4EXPORT long S4FUNCTION d4memIndexFindRange( D4MEMINDEX4 S4PTR *, const char S4PTR *, const char S4PTR *, long S4PTR *, long ) ;
+   S4EXPORT long S4FUNCTION d4memIndexFindRangeDouble( D4MEMINDEX4 S4PTR *, double, double, long S4PTR *, long ) ;
+   S4EXPORT long S4FUNCTION d4memIndexCount( D4MEMINDEX4 S4PTR *, const char S4PTR * ) ;
+   S4EXPORT long S4FUNCTION d4memIndexAll( D4MEMINDEX4 S4PTR *, long S4PTR *, long ) ;
+#endif
 #ifdef S4OFF_MULTI
    // AS 06/09/00 was not compiling in S4OFF_MULTI
    #define d4recCountAssumeLocked( d4 ) ( dfile4recCount( ( d4->dataFile ), 0 ) )
