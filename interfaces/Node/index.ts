@@ -830,7 +830,7 @@ export class MemIndex4 {
          const written = Number(fill(buf));
          const n = written > 0 ? Math.min(written, count) : 0;
          if (n === 0) return [];
-         return koffi.decode(buf, 'long', n).map((v: any) => Number(v));
+         return Array.from(koffi.decode(buf, 'long', n) as ArrayLike<number | bigint>, (v) => Number(v));
       } finally {
          koffi.free(buf);
       }
