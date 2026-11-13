@@ -265,6 +265,7 @@
     <ClCompile Include="..\..\WorkingSource\D4extra.c" />
     <ClCompile Include="..\..\WorkingSource\D4field.c" />
     <ClCompile Include="..\..\WorkingSource\D4file.c" />
+    <ClCompile Include="..\..\WorkingSource\D4memidx.c" />
     <ClCompile Include="..\..\WorkingSource\D4flush.c" />
     <ClCompile Include="..\..\WorkingSource\D4fresh.c" />
     <ClCompile Include="..\..\WorkingSource\D4go.c" />

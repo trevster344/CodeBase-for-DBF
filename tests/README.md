@@ -75,7 +75,8 @@ reports SKIP for x86 when no 32-bit Node is installed.
 
 `tests/Node/t4all.test.ts` is a Vitest suite that mirrors `test/CSharp/t4all.cs` (CODE4 lifecycle
 plus a full CRUD round-trip over STR/NUM/LOG/DBL/MEM with STR/NUM tags and a tag seek);
-`tests/Node/test.ts` is the standalone console test.
+`tests/Node/test.ts` is the standalone console test. `tests/Node/memidx.test.ts` covers the
+ephemeral in-memory index API (exact/range/count/all, stale refresh, memory limit, free-on-close).
 
 ### Linux engine
 

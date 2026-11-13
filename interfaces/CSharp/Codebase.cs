@@ -76,6 +76,11 @@ namespace CodeBase
       public const int r4autoTimestamp = 200 ;
       public const int r4done = 210 ;
 
+      /* flags for Data4.MemIndex */
+      public const uint D4MEMINDEX_INCLUDE_DELETED = 0x0001 ;
+      public const uint D4MEMINDEX_CASE_INSENSITIVE = 0x0002 ;
+      public const uint D4MEMINDEX_CHECK_STALE = 0x0004 ;
+
       public const int e4lock = -50 ;
       public const int e4fieldName = -210 ;
       public const int e4unique = -340 ;
@@ -437,6 +442,20 @@ namespace CodeBase
       private static extern short code4readLock( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short readLock ) ;
       [DllImport(CodeBaseNative.DllName)]
       private static extern short code4readOnly( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short readOnly ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexEnabled( IntPtr code4 ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexEnabledSet( IntPtr code4, int enabled ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexLimitSet( IntPtr code4, [MarshalAs(UnmanagedType.I4)] int maxBytes, [MarshalAs(UnmanagedType.I4)] int maxIndexes ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexLimitGet( IntPtr code4, out int maxBytes, out int maxIndexes ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexAutoRefresh( IntPtr code4 ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexAutoRefreshSet( IntPtr code4, int enabled ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int code4memIndexMemoryUsed( IntPtr code4 ) ;
       [DllImport(CodeBaseNative.DllName)]
       private static extern short code4safety( IntPtr code4, [MarshalAs(UnmanagedType.I2)] short safety ) ;
       [DllImport(CodeBaseNative.DllName)]
@@ -1014,6 +1033,37 @@ namespace CodeBase
          }
       }
 
+      /// <summary>Enable or disable ephemeral in-memory indexes (default enabled).</summary>
+      public bool memIndexEnabled
+      {
+         get { return code4memIndexEnabled( code4 ) != 0 ; }
+         set { code4memIndexEnabledSet( code4, value ? 1 : 0 ) ; }
+      }
+
+      /// <summary>Set the total in-memory index budget (bytes) and maximum index count. 0 = unlimited.</summary>
+      public int memIndexLimitSet( int maxBytes, int maxIndexes )
+      {
+         return code4memIndexLimitSet( code4, maxBytes, maxIndexes ) ;
+      }
+
+      /// <summary>Read the total in-memory index budget (bytes) and maximum index count.</summary>
+      public void memIndexLimitGet( out int maxBytes, out int maxIndexes )
+      {
+         code4memIndexLimitGet( code4, out maxBytes, out maxIndexes ) ;
+      }
+
+      public bool memIndexAutoRefresh
+      {
+         get { return code4memIndexAutoRefresh( code4 ) != 0 ; }
+         set { code4memIndexAutoRefreshSet( code4, value ? 1 : 0 ) ; }
+      }
+
+      /// <summary>Bytes currently held by in-memory indexes in this CODE4.</summary>
+      public int memIndexMemoryUsed()
+      {
+         return code4memIndexMemoryUsed( code4 ) ;
+      }
+
       public short safety
       {
          get
@@ -1452,6 +1502,36 @@ namespace CodeBase
          ) ;
       [DllImport(CodeBaseNative.DllName)]
       private static extern int d4zap( IntPtr data4, [MarshalAs(UnmanagedType.I4)] int first, [MarshalAs(UnmanagedType.I4)] int last ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern IntPtr d4memIndexGet( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string fieldName, uint flags ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexGetMany( IntPtr data4, IntPtr fieldNames, int fieldCount, uint flags, IntPtr outIndexes ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFree( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFreeAll( IntPtr data4 ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexRefresh( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexIsStale( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexRefreshIfStale( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexEstimate( IntPtr data4, [MarshalAs(UnmanagedType.LPStr)] string fieldName, uint flags ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexMemoryUsed( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFind( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string key, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindDouble( IntPtr index, double key, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindRange( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string from, [MarshalAs(UnmanagedType.LPStr)] string to, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindRangeDouble( IntPtr index, double from, double to, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexCount( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string key ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexAll( IntPtr index, IntPtr recNos, int maxRecs ) ;
 
       public Data4() { data = IntPtr.Zero; }
       public Data4( Data4 d ) { data = d.data ; code4 = d.code4 ; }
@@ -1600,6 +1680,66 @@ namespace CodeBase
       }
 
       public int numFields()                { return (int)d4numFields( data ) ; }
+
+      /// <summary>
+      /// Get or build an ephemeral in-memory index on one field. No .cdx/tag is created.
+      /// </summary>
+      public MemIndex4 MemIndex( string fieldName, uint flags = 0 )
+      {
+         IntPtr handle = d4memIndexGet( data, fieldName, flags ) ;
+         if ( handle == IntPtr.Zero )
+            throw new InvalidOperationException( "d4memIndexGet('" + fieldName + "') failed" ) ;
+         return new MemIndex4( this, handle ) ;
+      }
+
+      /// <summary>Free all in-memory indexes attached to this Data4.</summary>
+      public int FreeMemIndexes()
+      {
+         return d4memIndexFreeAll( data ) ;
+      }
+
+      /// <summary>
+      /// Get or build several in-memory indexes in one table scan. Prefer this over calling
+      /// <see cref="MemIndex"/> repeatedly when building more than one index.
+      /// </summary>
+      public MemIndex4[] MemIndexMany( string[] fieldNames, uint flags = 0 )
+      {
+         if ( fieldNames == null || fieldNames.Length == 0 )
+            return new MemIndex4[0] ;
+
+         int n = fieldNames.Length ;
+         IntPtr[] names = new IntPtr[n] ;
+         IntPtr namesArray = Marshal.AllocHGlobal( IntPtr.Size * n ) ;
+         IntPtr outArray = Marshal.AllocHGlobal( IntPtr.Size * n ) ;
+         try
+         {
+            for ( int i = 0 ; i < n ; i++ )
+               names[i] = Marshal.StringToHGlobalAnsi( fieldNames[i] ) ;
+            Marshal.Copy( names, 0, namesArray, n ) ;
+
+            int rc = d4memIndexGetMany( data, namesArray, n, flags, outArray ) ;
+            if ( rc < 0 )
+               throw new InvalidOperationException( "d4memIndexGetMany failed" ) ;
+
+            MemIndex4[] result = new MemIndex4[n] ;
+            for ( int i = 0 ; i < n ; i++ )
+            {
+               IntPtr handle = Marshal.ReadIntPtr( outArray, i * IntPtr.Size ) ;
+               if ( handle == IntPtr.Zero )
+                  throw new InvalidOperationException( "d4memIndexGetMany returned a null index" ) ;
+               result[i] = new MemIndex4( this, handle ) ;
+            }
+            return result ;
+         }
+         finally
+         {
+            for ( int i = 0 ; i < n ; i++ )
+               if ( names[i] != IntPtr.Zero )
+                  Marshal.FreeHGlobal( names[i] ) ;
+            Marshal.FreeHGlobal( namesArray ) ;
+            Marshal.FreeHGlobal( outArray ) ;
+         }
+      }
       public int open( ref Code4 code, string name )
       {
          data =  d4open( code.cod(), name ) ;
@@ -1989,6 +2129,171 @@ namespace CodeBase
       }
    } ;
 
+
+   public class MemIndex4 : IDisposable
+   {
+      private IntPtr index ;
+      private Data4 owner ;
+
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFree( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexRefresh( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexIsStale( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexRefreshIfStale( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexMemoryUsed( IntPtr index ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFind( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string key, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindDouble( IntPtr index, double key, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindRange( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string from, [MarshalAs(UnmanagedType.LPStr)] string to, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexFindRangeDouble( IntPtr index, double from, double to, IntPtr recNos, int maxRecs ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexCount( IntPtr index, [MarshalAs(UnmanagedType.LPStr)] string key ) ;
+      [DllImport(CodeBaseNative.DllName)]
+      private static extern int d4memIndexAll( IntPtr index, IntPtr recNos, int maxRecs ) ;
+
+      public MemIndex4( Data4 data, IntPtr handle )
+      {
+         owner = data ;
+         index = handle ;
+      }
+
+      private IntPtr Handle
+      {
+         get
+         {
+            if ( index == IntPtr.Zero || owner == null || owner.dat() == IntPtr.Zero )
+               throw new ObjectDisposedException( "MemIndex4" ) ;
+            return index ;
+         }
+      }
+
+      private int[] Fetch( int count, Func<IntPtr, int> fill )
+      {
+         if ( count <= 0 )
+            return new int[0] ;
+
+         int[] recs = new int[count] ;
+         GCHandle pinned = GCHandle.Alloc( recs, GCHandleType.Pinned ) ;
+         try
+         {
+            int written = fill( pinned.AddrOfPinnedObject() ) ;
+            if ( written < 0 )
+               throw new InvalidOperationException( "in-memory index lookup failed" ) ;
+            if ( written < count )
+               Array.Resize( ref recs, written ) ;
+            return recs ;
+         }
+         finally
+         {
+            pinned.Free() ;
+         }
+      }
+
+      /// <summary>Exact match on a character/date/datetime key.</summary>
+      public int[] Find( string key )
+      {
+         int n = d4memIndexFind( Handle, key, IntPtr.Zero, 0 ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexFind failed" ) ;
+         return Fetch( n, p => d4memIndexFind( Handle, key, p, n ) ) ;
+      }
+
+      /// <summary>Exact match on a numeric key.</summary>
+      public int[] Find( double key )
+      {
+         int n = d4memIndexFindDouble( Handle, key, IntPtr.Zero, 0 ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexFindDouble failed" ) ;
+         return Fetch( n, p => d4memIndexFindDouble( Handle, key, p, n ) ) ;
+      }
+
+      /// <summary>Inclusive range on a character/date/datetime key.</summary>
+      public int[] FindRange( string from, string to )
+      {
+         int n = d4memIndexFindRange( Handle, from, to, IntPtr.Zero, 0 ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexFindRange failed" ) ;
+         return Fetch( n, p => d4memIndexFindRange( Handle, from, to, p, n ) ) ;
+      }
+
+      /// <summary>Inclusive range on a numeric key.</summary>
+      public int[] FindRange( double from, double to )
+      {
+         int n = d4memIndexFindRangeDouble( Handle, from, to, IntPtr.Zero, 0 ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexFindRangeDouble failed" ) ;
+         return Fetch( n, p => d4memIndexFindRangeDouble( Handle, from, to, p, n ) ) ;
+      }
+
+      /// <summary>All record numbers in key order.</summary>
+      public int[] All()
+      {
+         int n = d4memIndexAll( Handle, IntPtr.Zero, 0 ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexAll failed" ) ;
+         return Fetch( n, p => d4memIndexAll( Handle, p, n ) ) ;
+      }
+
+      public int Count( string key )
+      {
+         int n = d4memIndexCount( Handle, key ) ;
+         if ( n < 0 )
+            throw new InvalidOperationException( "d4memIndexCount failed" ) ;
+         return n ;
+      }
+
+      public void Refresh()
+      {
+         int rc = d4memIndexRefresh( Handle ) ;
+         if ( rc < 0 )
+            throw new InvalidOperationException( "d4memIndexRefresh failed" ) ;
+      }
+
+      public bool IsStale()
+      {
+         return d4memIndexIsStale( Handle ) != 0 ;
+      }
+
+      public bool RefreshIfStale()
+      {
+         int rc = d4memIndexRefreshIfStale( Handle ) ;
+         if ( rc < 0 )
+            throw new InvalidOperationException( "d4memIndexRefreshIfStale failed" ) ;
+         return rc > 0 ;
+      }
+
+      public int MemoryUsed()
+      {
+         return d4memIndexMemoryUsed( Handle ) ;
+      }
+
+      public int Free()
+      {
+         if ( index == IntPtr.Zero )
+            return 0 ;
+         if ( owner == null || owner.dat() == IntPtr.Zero )
+         {
+            index = IntPtr.Zero ;
+            return 0 ;
+         }
+         int rc = d4memIndexFree( index ) ;
+         index = IntPtr.Zero ;
+         return rc ;
+      }
+
+      public void Dispose()
+      {
+         Free() ;
+         GC.SuppressFinalize( this ) ;
+      }
+   }
 
    public class Field4 : Error4
    {

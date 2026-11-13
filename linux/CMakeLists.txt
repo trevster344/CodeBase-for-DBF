@@ -33,6 +33,7 @@ set(CODEBASE_SOURCES
   ${REPO_ROOT}/WorkingSource/C4hook.c
   ${REPO_ROOT}/WorkingSource/C4trans.c
   ${REPO_ROOT}/WorkingSource/D4MODIFY.C
+  ${REPO_ROOT}/WorkingSource/D4memidx.c
   ${REPO_ROOT}/WorkingSource/D4append.c
   ${REPO_ROOT}/WorkingSource/D4bottom.c
   ${REPO_ROOT}/WorkingSource/D4close.c

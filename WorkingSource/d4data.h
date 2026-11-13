@@ -215,6 +215,7 @@ extern BOOL s5hasDescending;
 struct DATA4St ;
 struct FIELD4St ;
 struct DATA4FILESt ;
+struct D4MEMINDEX4St ;
 
 #ifdef S4COMPILE_TEST
    #ifndef S4OFF_MEMO
@@ -2823,6 +2824,16 @@ typedef struct CODE4St
       void *qlz_state_decompress;
    #endif
 
+   #ifndef S4OFF_MEMINDEX
+      /* Ephemeral in-memory index policy. */
+      int memIndexEnabled ;
+      long memIndexMaxBytes ;
+      int memIndexMaxCount ;
+      long memIndexBytesUsed ;
+      int memIndexCount ;
+      int memIndexAutoRefresh ;
+   #endif
+
    // CS 2007/02/21 This must always be at the bottom of the CODE4 structure. It is used to calculate the size of the struct.
    int code4bottom ;
 
@@ -3574,6 +3585,9 @@ typedef struct DATA4St
    #ifndef S4CLIENT
       short hasMemoExpr ;  // one of r4uninitializedMemoTagExpression(0), r4noMemoTagExpression, or r4memoTagExpression
       Bool5 useOldMemo ;   // set to true to use old memo when generating keys
+   #endif
+   #ifndef S4OFF_MEMINDEX
+      struct D4MEMINDEX4St *memIndexes ;   /* ephemeral in-memory indexes owned by this DATA4 */
    #endif
 } DATA4 ;
 

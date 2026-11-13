@@ -123,6 +123,28 @@ EXPORTS
    d4logStatusCB
    d4log
    d4memoCompress
+   code4memIndexAutoRefresh
+   code4memIndexAutoRefreshSet
+   code4memIndexEnabled
+   code4memIndexEnabledSet
+   code4memIndexLimitGet
+   code4memIndexLimitSet
+   code4memIndexMemoryUsed
+   d4memIndexAll
+   d4memIndexCount
+   d4memIndexEstimate
+   d4memIndexFind
+   d4memIndexFindDouble
+   d4memIndexFindRange
+   d4memIndexFindRangeDouble
+   d4memIndexFree
+   d4memIndexFreeAll
+   d4memIndexGet
+   d4memIndexGetMany
+   d4memIndexIsStale
+   d4memIndexMemoryUsed
+   d4memIndexRefresh
+   d4memIndexRefreshIfStale
    d4numFields
    d4open
    d4openClone

@@ -40,3 +40,11 @@
 #define E90125  90125   /* connection4serverId */
 #define E90126  90126   /* connection4readLock */
 #define E90127  90127   /* connection4enforceLock */
+
+/* in-memory index errors */
+#define E9MI01  90201   /* d4memIndexGet/Build */
+#define E9MI02  90202   /* d4memIndexFind */
+#define E9MI03  90203   /* d4memIndexRefresh */
+#define E9MI04  90204   /* d4memIndexEstimate */
+#define E9MI05  90205   /* code4memIndex */
+#define E9MI06  90206   /* d4memIndexGetMany */

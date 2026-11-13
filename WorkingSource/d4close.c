@@ -645,6 +645,10 @@ int S4FUNCTION d4close( DATA4 *data )
       data->debugInt = 0 ;
    #endif
 
+   #ifndef S4OFF_MEMINDEX
+      d4memIndexFreeAll( data ) ;
+   #endif
+
    if ( c4->dataMemory != 0 ) /* LY 2002/08/14 : avoid -935 error */
       mem4free( c4->dataMemory, data ) ;
 

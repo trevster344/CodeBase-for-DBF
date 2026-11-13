@@ -34,6 +34,7 @@ Module Program
         Dim rc As Integer = 0
         rc = rc Or TestLifecycle()
         rc = rc Or TestCrud()
+        rc = rc Or TestMemIndex()
 
         Console.WriteLine(If(rc = 0, "PASS", "FAIL"))
         Return rc
@@ -159,6 +160,106 @@ Module Program
             Return 0
         Catch ex As Exception
             Console.WriteLine("  crud      : EXCEPTION " & ex.GetType().Name & ": " & ex.Message)
+            Return 1
+        Finally
+            code4initUndo(c4)
+            DeleteTable(table)
+        End Try
+    End Function
+
+    Private Function TestMemIndex() As Integer
+        Dim dir As String = Path.Combine(Path.GetTempPath(), "codebase_tests")
+        Directory.CreateDirectory(dir)
+        Dim table As String = Path.Combine(dir, "VBMEMIDXTEST")
+        DeleteTable(table)
+
+        Dim c4 = code4init()
+        Try
+            code4errOff(c4, 1)
+            code4singleOpen(c4, 0)
+            code4safety(c4, 0)
+            code4compatibility(c4, 30)
+            code4readOnly(c4, 0)
+            code4memIndexLimitSet(c4, 16 * 1024 * 1024, 8)
+            code4memIndexAutoRefreshSet(c4, 1)
+
+            Dim fields(3) As FIELD4INFO
+            fields(0).fName = "PROGRAM_ID" : fields(0).ftype = "C" : fields(0).flength = 10
+            fields(1).fName = "ADATE" : fields(1).ftype = "D" : fields(1).flength = 8
+            fields(2).fName = "AMT" : fields(2).ftype = "N" : fields(2).flength = 8
+
+            Dim tags(1) As TAG4INFO
+            Dim d4 = d4create(c4, table, fields, tags)
+            If d4numFields(d4) <> 3 Then
+                Console.WriteLine("  memindex  : FAIL (d4create created " & d4numFields(d4) & " fields)")
+                Return 1
+            End If
+
+            Const N As Integer = 1000
+            d4appendStart(d4, 0)
+            Dim fProgram = d4field(d4, "PROGRAM_ID")
+            Dim fDate = d4field(d4, "ADATE")
+            Dim fAmt = d4field(d4, "AMT")
+            For i As Integer = 0 To N - 1
+                d4appendBlank(d4)
+                f4assign(fProgram, "P" & (i Mod 10))
+                f4assign(fDate, "202601" & ((i Mod 28) + 1).ToString("00"))
+                f4assign(fAmt, i.ToString())
+            Next
+            d4flush(d4)
+            d4close(d4)
+
+            Dim d2 = d4open(c4, table)
+            Dim byDate = d4memIndexGet(d2, "ADATE", 4)
+            Dim hits = MemIndexFind(byDate, "20260115")
+            If hits.Length <> 36 Then
+                Console.WriteLine("  memindex  : FAIL (date hits = " & hits.Length & ", expected 36)")
+                Return 1
+            End If
+
+            Dim range = MemIndexFindRange(byDate, "20260105", "20260110")
+            If range.Length <> 216 Then
+                Console.WriteLine("  memindex  : FAIL (range hits = " & range.Length & ", expected 216)")
+                Return 1
+            End If
+
+            Dim all = MemIndexAll(byDate)
+            If all.Length <> N Then
+                Console.WriteLine("  memindex  : FAIL (all = " & all.Length & ", expected " & N & ")")
+                Return 1
+            End If
+
+            Dim byProgram = d4memIndexGet(d2, "PROGRAM_ID", 4)
+            Dim p3 = MemIndexFind(byProgram, "P3")
+            If p3.Length <> 100 Then
+                Console.WriteLine("  memindex  : FAIL (P3 hits = " & p3.Length & ", expected 100)")
+                Return 1
+            End If
+
+            d4appendStart(d2, 0)
+            d4appendBlank(d2)
+            f4assign(d4field(d2, "PROGRAM_ID"), "P3")
+            f4assign(d4field(d2, "ADATE"), "20260115")
+            f4assign(d4field(d2, "AMT"), "1")
+            d4flush(d2)
+
+            If d4memIndexIsStale(byDate) = 0 Then
+                Console.WriteLine("  memindex  : FAIL (index not marked stale after append)")
+                Return 1
+            End If
+            Dim after = MemIndexFind(byDate, "20260115")
+            If after.Length <> 37 Then
+                Console.WriteLine("  memindex  : FAIL (auto-refresh hits = " & after.Length & ", expected 37)")
+                Return 1
+            End If
+
+            d4memIndexFree(byDate)
+            d4memIndexFree(byProgram)
+            d4close(d2)
+            Console.WriteLine("  memindex  : build/find/range/all/stale OK")
+            Return 0
+        Catch ex As Exception
+            Console.WriteLine("  memindex  : EXCEPTION " & ex.GetType().Name & ": " & ex.Message)
             Return 1
         Finally
             code4initUndo(c4)
